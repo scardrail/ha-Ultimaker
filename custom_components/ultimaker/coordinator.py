@@ -45,7 +45,6 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         self.host = host
         self.session = session
         self._data: dict[str, Any] = {}
-        self._listeners: set[Callable] = set()
 
         super().__init__(
             hass,
@@ -111,14 +110,6 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         except aiohttp.ClientError as err:
             _LOGGER.error("Error sending command to %s: %s", url, err)
             return False
-
-    def async_add_listener(self, update_callback: Callable) -> None:
-        """Add a listener for data updates."""
-        self._listeners.add(update_callback)
-
-    def async_remove_listener(self, update_callback: Callable) -> None:
-        """Remove a listener for data updates."""
-        self._listeners.discard(update_callback)
 
     async def async_pause_print(self) -> bool:
         """Pause the current print job."""
