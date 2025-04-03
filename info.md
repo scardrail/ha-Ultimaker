@@ -1,7 +1,7 @@
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg?style=for-the-badge)](https://github.com/custom-components/hacs)
 # Home Assistant Ultimaker printers
 
-Clews fork
+Personal version with new sensors
 
 ![sensors](https://github.com/jellespijker/home-assistant-ultimaker/raw/main/resources/home-assistant-um.png)
 
@@ -17,21 +17,28 @@ Adds support for the following ultimaker printer sensors:
 - Bed temperature
 - Bed target temperature
 
-# Install
+{% if installed %}
+## Changes as compared to your installed version:
 
-## Using HACS:
+### Features
 
-Just search for **ultimaker** in the HACS integration bar
+{% if version_installed.replace("v", "").replace("V", "").replace(".","") | int < 14  %}
+- Added `bed_type`
+- Added `hotend_1_id`
+- Added `hotend_2_id`
+{% endif %}
+{% if version_installed.replace("v", "").replace("V", "").replace(".","") | int < 15  %}
+- Support from Python 3.8 and higher
+- Support Home Assistant OS 5.4.99 and higher
+{% endif %}
 
+### Bugfixes
 
-## From source:
+{% else %}
 
-Copy the `ultimaker` directory in your own `custom_components` folder
+## Usage
 
-
-# Usage
-
-configuration.yaml
+Add the Ultimaker platform to your sensors in `configuration.yaml`
 
 ```yaml
 sensor:
@@ -44,18 +51,32 @@ sensor:
       - status  # optional
       - state  # optional
       - progress  # optional
+      - time_elapsed # optional
+      - time_estimated # optional
+      - time_total # optional
       - bed_type  # optional
       - bed_temperature  # optional
       - bed_temperature_target  # optional
       - hotend_1_id  # optional
       - hotend_1_temperature  # optional
       - hotend_1_temperature_target  # optional
+      - hotend_1_statistics_material_extruded # optional
+      - hotend_1_statistics_prints_since_cleaned # optional
+      - hotend_1_statistics_max_temperature_exposed # optional
+      - hotend_1_statistics_time_spent_hot # optional
+      - hotend_1_serial # optional
       - hotend_2_id  # optional
       - hotend_2_temperature  # optional
       - hotend_2_temperature_target  # optional
+      - hotend_2_statistics_material_extruded # optional
+      - hotend_2_statistics_prints_since_cleaned # optional
+      - hotend_1_statistics_max_temperature_exposed # optional
+      - hotend_1_statistics_time_spent_hot # optional
+      - hotend_2_serial # optional
 ```
 
-add a camera to the configuration.yaml
+### Camera
+Define a generic camera in the `configuration.yaml`
 
 ```yaml
 camera:
@@ -64,7 +85,9 @@ camera:
     framerate: 4
 ```
 
-add a lovelace card to the UI
+### Lovelace card
+
+Add a lovelace card to the UI, replace `printername` with the name you specified in your `configuration.yaml`
 
 ```typescript
 type: vertical-stack
@@ -89,3 +112,5 @@ cards:
       yellow: 33
       red: 0
 ```
+
+{% endif %}
