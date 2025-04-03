@@ -60,11 +60,15 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                 printer_data = await self._fetch_data(API_PRINTER)
                 print_job_data = await self._fetch_data(API_PRINT_JOB)
                 system_data = await self._fetch_data(API_SYSTEM)
+                bed_temp_data = await self._fetch_data(API_BED_TEMPERATURE)
+                hotend_temp_data = await self._fetch_data(API_HOTEND_TEMPERATURE)
 
                 data = {
                     "printer": printer_data,
                     "print_job": print_job_data,
                     "system": system_data,
+                    "bed_temperature": bed_temp_data,
+                    "hotend_temperature": hotend_temp_data,
                     "last_update": datetime.now(),
                 }
 
