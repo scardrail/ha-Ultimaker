@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Callable
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -27,6 +27,11 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+HEADERS = {
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+}
+
 class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Ultimaker data."""
 
@@ -40,6 +45,7 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         self.host = host
         self.session = session
         self._data: dict[str, Any] = {}
+        self._listeners: set[Callable] = set()
 
         super().__init__(
             hass,
@@ -73,7 +79,7 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         url = f"http://{self.host}{endpoint}"
         
         try:
-            async with self.session.get(url) as response:
+            async with self.session.get(url, headers=HEADERS) as response:
                 if response.status == 200:
                     return await response.json()
                 elif response.status == 404:
@@ -96,15 +102,23 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         
         try:
             if isinstance(data, dict):
-                async with self.session.request(method, url, json=data) as response:
+                async with self.session.request(method, url, json=data, headers=HEADERS) as response:
                     return response.status in (200, 204)
             else:
                 # Pour les cas où data n'est pas un dict (ex: température qui est un float)
-                async with self.session.request(method, url, data={"temperature": data}) as response:
+                async with self.session.request(method, url, json={"temperature": data}, headers=HEADERS) as response:
                     return response.status in (200, 204)
         except aiohttp.ClientError as err:
             _LOGGER.error("Error sending command to %s: %s", url, err)
             return False
+
+    def async_add_listener(self, update_callback: Callable) -> None:
+        """Add a listener for data updates."""
+        self._listeners.add(update_callback)
+
+    def async_remove_listener(self, update_callback: Callable) -> None:
+        """Remove a listener for data updates."""
+        self._listeners.discard(update_callback)
 
     async def async_pause_print(self) -> bool:
         """Pause the current print job."""
