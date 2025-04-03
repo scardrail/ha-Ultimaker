@@ -47,9 +47,9 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         """Update data via library."""
         try:
             async with async_timeout.timeout(10):
-                printer_data = await self._fetch_data(API_PRINTER)
-                print_job_data = await self._fetch_data(API_PRINT_JOB)
-                system_data = await self._fetch_data(API_SYSTEM)
+                printer_data = await self._fetch_data("/printer")
+                print_job_data = await self._fetch_data("/print_job")
+                system_data = await self._fetch_data("/system")
 
                 data = {
                     "printer": printer_data,
@@ -71,6 +71,11 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
             async with self.session.get(url) as response:
                 if response.status == 200:
                     return await response.json()
+                elif response.status == 404:
+                    _LOGGER.debug(
+                        "Resource not found at %s: %s", url, response.status
+                    )
+                    return {}
                 else:
                     _LOGGER.error(
                         "Error fetching data from %s: %s", url, response.status
@@ -80,45 +85,44 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Error fetching data from %s: %s", url, err)
             return {}
 
-    async def _send_command(self, endpoint: str, method: str = "POST", data: dict[str, Any] | None = None) -> bool:
+    async def _send_command(self, endpoint: str, method: str = "PUT", data: Any = None) -> bool:
         """Send a command to the printer."""
         url = f"http://{self.host}{endpoint}"
         
         try:
-            async with self.session.request(method, url, json=data) as response:
-                if response.status == 200:
-                    return True
-                else:
-                    _LOGGER.error(
-                        "Error sending command to %s: %s", url, response.status
-                    )
-                    return False
+            if isinstance(data, dict):
+                async with self.session.request(method, url, json=data) as response:
+                    return response.status in (200, 204)
+            else:
+                # Pour les cas où data n'est pas un dict (ex: température qui est un float)
+                async with self.session.request(method, url, data={"temperature": data}) as response:
+                    return response.status in (200, 204)
         except aiohttp.ClientError as err:
             _LOGGER.error("Error sending command to %s: %s", url, err)
             return False
 
     async def async_pause_print(self) -> bool:
         """Pause the current print job."""
-        return await self._send_command("/api/v1/print_job/pause")
+        return await self._send_command("/print_job/state", data="pause")
 
     async def async_resume_print(self) -> bool:
         """Resume the current print job."""
-        return await self._send_command("/api/v1/print_job/resume")
+        return await self._send_command("/print_job/state", data="print")
 
     async def async_stop_print(self) -> bool:
         """Stop the current print job."""
-        return await self._send_command("/api/v1/print_job/stop")
+        return await self._send_command("/print_job/state", data="abort")
 
     async def async_set_bed_temperature(self, temperature: float) -> bool:
         """Set the bed temperature."""
         return await self._send_command(
-            "/api/v1/printer/bed/temperature",
-            data={"target": temperature}
+            "/printer/bed/temperature",
+            data=temperature
         )
 
     async def async_set_hotend_temperature(self, temperature: float) -> bool:
         """Set the hotend temperature."""
         return await self._send_command(
-            "/api/v1/printer/heads/0/extruders/0/hotend/temperature",
-            data={"target": temperature}
+            "/printer/heads/0/extruders/0/hotend/temperature",
+            data=temperature
         ) 
