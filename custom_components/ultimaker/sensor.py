@@ -63,7 +63,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["printer"].get("bed_temperature", 0),
+        value_fn=lambda data: data["printer"].get("bed", {}).get("current", 0),
     ),
     UltimakerSensorEntityDescription(
         key="bed_target",
@@ -71,7 +71,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["printer"].get("bed_target", 0),
+        value_fn=lambda data: data["printer"].get("bed", {}).get("target", 0),
     ),
     UltimakerSensorEntityDescription(
         key="hotend_temperature",
@@ -79,7 +79,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["printer"].get("hotend_temperature", 0),
+        value_fn=lambda data: data["printer"].get("heads", [{}])[0].get("extruders", [{}])[0].get("hotend", {}).get("current", 0),
     ),
     UltimakerSensorEntityDescription(
         key="hotend_target",
@@ -87,7 +87,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["printer"].get("hotend_target", 0),
+        value_fn=lambda data: data["printer"].get("heads", [{}])[0].get("extruders", [{}])[0].get("hotend", {}).get("target", 0),
     ),
     UltimakerSensorEntityDescription(
         key="print_time",
@@ -150,10 +150,10 @@ class UltimakerSensor(CoordinatorEntity[UltimakerDataUpdateCoordinator], SensorE
         """Return the state attributes."""
         data = self.coordinator.data
         return {
-            ATTR_BED_TEMPERATURE: data["printer"].get("bed_temperature"),
-            ATTR_BED_TARGET: data["printer"].get("bed_target"),
-            ATTR_HOTEND_TEMPERATURE: data["printer"].get("hotend_temperature"),
-            ATTR_HOTEND_TARGET: data["printer"].get("hotend_target"),
+            ATTR_BED_TEMPERATURE: data["printer"].get("bed", {}).get("current"),
+            ATTR_BED_TARGET: data["printer"].get("bed", {}).get("target"),
+            ATTR_HOTEND_TEMPERATURE: data["printer"].get("heads", [{}])[0].get("extruders", [{}])[0].get("hotend", {}).get("current"),
+            ATTR_HOTEND_TARGET: data["printer"].get("heads", [{}])[0].get("extruders", [{}])[0].get("hotend", {}).get("target"),
             ATTR_PROGRESS: data["print_job"].get("progress"),
             ATTR_PRINT_TIME: data["print_job"].get("print_time"),
             ATTR_ESTIMATED_TIME: data["print_job"].get("estimated_time"),
