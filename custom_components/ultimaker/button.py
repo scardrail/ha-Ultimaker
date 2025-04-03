@@ -81,9 +81,4 @@ class UltimakerButton(CoordinatorEntity[UltimakerDataUpdateCoordinator], ButtonE
 
     async def async_press(self) -> None:
         """Press the button."""
-        await self.entity_description.press_fn(self.coordinator)
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        return self.coordinator.last_update_success 
+        await self.entity_description.press_fn(self.coordinator) 

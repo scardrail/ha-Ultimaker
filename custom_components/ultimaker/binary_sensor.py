@@ -83,9 +83,4 @@ class UltimakerBinarySensor(CoordinatorEntity[UltimakerDataUpdateCoordinator], B
     @property
     def is_on(self) -> bool | None:
         """Return true if the binary sensor is on."""
-        return self.entity_description.value_fn(self.coordinator.data)
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        return self.coordinator.last_update_success 
+        return self.entity_description.value_fn(self.coordinator.data) 
