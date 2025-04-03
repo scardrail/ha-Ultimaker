@@ -1,12 +1,15 @@
 {
   "domain": "ultimaker",
   "name": "Ultimaker",
-  "documentation": "https://www.home-assistant.io/integrations/ultimaker",
+  "documentation": "https://github.com/tperquis/ha-ultimaker",
   "issue_tracker": "https://github.com/clews/home-assistant-ultimaker/issues",
   "dependencies": ["camera"],
-  "codeowners": ["@yourusername"],
-  "requirements": ["aiohttp>=3.8.0"],
+  "codeowners": ["@tperquis"],
+  "requirements": [],
   "config_flow": true,
   "iot_class": "local_polling",
-  "version": "1.0.0"
+  "version": "0.1.0",
+  "homekit": {},
+  "ssdp": [],
+  "zeroconf": []
 }

@@ -24,15 +24,18 @@ async def async_setup_entry(
 
     # Vérifier si la caméra est disponible dans les données de l'imprimante
     printer_data = coordinator.data.get("printer", {})
+    _LOGGER.debug("Printer data for camera setup: %s", printer_data)
+    
     if "camera" in printer_data and printer_data.get("camera", {}).get("feed"):
-        _LOGGER.debug("Camera feed found, setting up camera entities")
+        _LOGGER.debug("Camera feed found: %s", printer_data["camera"]["feed"])
         entities = [
             UltimakerStreamCamera(coordinator, entry),
             UltimakerSnapshotCamera(coordinator, entry),
         ]
         async_add_entities(entities)
+        _LOGGER.info("Added camera entities for Ultimaker")
     else:
-        _LOGGER.debug("No camera feed found")
+        _LOGGER.warning("No camera feed found in printer data")
 
 class UltimakerStreamCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], Camera):
     """Representation of an Ultimaker camera stream."""
@@ -59,15 +62,18 @@ class UltimakerStreamCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], C
             manufacturer="Ultimaker",
         )
         self._host = entry.data["host"]
+        _LOGGER.debug("Initialized stream camera for %s", self._host)
 
     @property
     def available(self) -> bool:
         """Return if camera is available."""
-        return (
+        is_available = (
             self.coordinator.data.get("printer", {})
             .get("camera", {})
             .get("feed") is not None
         )
+        _LOGGER.debug("Stream camera available: %s", is_available)
+        return is_available
 
     @property
     def is_streaming(self) -> bool:
@@ -87,6 +93,7 @@ class UltimakerStreamCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], C
     async def stream_source(self) -> str | None:
         """Return the source of the stream."""
         if not self.available:
+            _LOGGER.debug("Stream not available")
             return None
             
         camera_feed = (
@@ -95,7 +102,10 @@ class UltimakerStreamCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], C
             .get("feed")
         )
         if camera_feed:
-            return f"http://{self._host}{camera_feed}"
+            url = f"http://{self._host}{camera_feed}"
+            _LOGGER.debug("Stream URL: %s", url)
+            return url
+        _LOGGER.debug("No camera feed found")
         return None
 
 class UltimakerSnapshotCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], Camera):
@@ -122,15 +132,18 @@ class UltimakerSnapshotCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator],
             manufacturer="Ultimaker",
         )
         self._host = entry.data["host"]
+        _LOGGER.debug("Initialized snapshot camera for %s", self._host)
 
     @property
     def available(self) -> bool:
         """Return if camera is available."""
-        return (
+        is_available = (
             self.coordinator.data.get("printer", {})
             .get("camera", {})
             .get("feed") is not None
         )
+        _LOGGER.debug("Snapshot camera available: %s", is_available)
+        return is_available
 
     @property
     def is_streaming(self) -> bool:
@@ -147,15 +160,20 @@ class UltimakerSnapshotCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator],
     ) -> bytes | None:
         """Return a still image from the camera."""
         if not self.available:
+            _LOGGER.debug("Snapshot not available")
             return None
 
         try:
+            url = f"http://{self._host}/camera/0/snapshot"
+            _LOGGER.debug("Getting snapshot from: %s", url)
             async with self.coordinator.session.get(
-                f"http://{self._host}/camera/0/snapshot",
+                url,
                 headers={"Accept": "image/jpeg"},
             ) as response:
                 if response.status == 200:
+                    _LOGGER.debug("Successfully got snapshot")
                     return await response.read()
+                _LOGGER.error("Failed to get snapshot, status: %s", response.status)
         except Exception as err:
             _LOGGER.error("Error getting camera image: %s", err)
             return None

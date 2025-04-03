@@ -17,9 +17,13 @@ API_SYSTEM: Final = f"{API_PREFIX}/system"
 API_BED_TEMPERATURE: Final = f"{API_PREFIX}/printer/bed/temperature"
 API_HOTEND_TEMPERATURE: Final = f"{API_PREFIX}/printer/heads/0/extruders/0/hotend/temperature"
 API_PRINT_JOB_STATE: Final = f"{API_PREFIX}/print_job/state"
+API_CAMERA: Final = f"{API_PREFIX}/camera"
+API_CAMERA_FEED: Final = f"{API_CAMERA}/feed"
+API_CAMERA_SNAPSHOT: Final = f"{API_CAMERA}/0/snapshot"
+API_CAMERA_STREAM: Final = f"{API_CAMERA}/0/stream"
 
 # Update interval
-UPDATE_INTERVAL: Final = 30  # seconds
+UPDATE_INTERVAL: Final = 10  # seconds
 
 # Printer states
 PRINTER_STATE_IDLE: Final = "idle"

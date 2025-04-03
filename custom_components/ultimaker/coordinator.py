@@ -18,6 +18,8 @@ from .const import (
     API_BED_TEMPERATURE,
     API_HOTEND_TEMPERATURE,
     API_PRINT_JOB_STATE,
+    API_CAMERA,
+    API_CAMERA_FEED,
     PRINT_JOB_STATE_PAUSED,
     PRINT_JOB_STATE_PRINTING,
     PRINT_JOB_STATE_ABORTED,
@@ -38,13 +40,11 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        session: aiohttp.ClientSession,
-        host: str,
+        entry: ConfigEntry,
     ) -> None:
         """Initialize."""
-        self.host = host
-        self.session = session
-        self._data: dict[str, Any] = {}
+        self.host = entry.data["host"]
+        self.session = async_get_clientsession(hass)
 
         super().__init__(
             hass,
@@ -62,9 +62,19 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                 system_data = await self._fetch_data(API_SYSTEM)
                 bed_temp_data = await self._fetch_data(API_BED_TEMPERATURE)
                 hotend_temp_data = await self._fetch_data(API_HOTEND_TEMPERATURE)
+                camera_data = await self._fetch_data(API_CAMERA)
+
+                # Si nous avons des données de caméra, essayons de récupérer le flux
+                if camera_data:
+                    camera_feed = await self._fetch_data(API_CAMERA_FEED)
+                    if camera_feed:
+                        camera_data["feed"] = camera_feed.get("feed")
 
                 data = {
-                    "printer": printer_data,
+                    "printer": {
+                        **printer_data,
+                        "camera": camera_data,
+                    },
                     "print_job": print_job_data,
                     "system": system_data,
                     "bed_temperature": bed_temp_data,
