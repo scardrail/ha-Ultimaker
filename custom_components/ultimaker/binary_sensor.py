@@ -13,6 +13,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import UltimakerDataUpdateCoordinator
@@ -28,13 +29,13 @@ BINARY_SENSOR_TYPES: tuple[UltimakerBinarySensorEntityDescription, ...] = (
         key="printing",
         name="Printing",
         device_class=BinarySensorDeviceClass.RUNNING,
-        value_fn=lambda data: data["print_job"].get("state") == "printing",
+        value_fn=lambda data: data["printer"].get("status") == "printing",
     ),
     UltimakerBinarySensorEntityDescription(
         key="paused",
         name="Paused",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        value_fn=lambda data: data["print_job"].get("state") == "paused",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        value_fn=lambda data: data["printer"].get("status") == "paused",
     ),
     UltimakerBinarySensorEntityDescription(
         key="error",
@@ -57,9 +58,10 @@ async def async_setup_entry(
         for description in BINARY_SENSOR_TYPES
     )
 
-class UltimakerBinarySensor(BinarySensorEntity):
+class UltimakerBinarySensor(CoordinatorEntity[UltimakerDataUpdateCoordinator], BinarySensorEntity):
     """Representation of an Ultimaker binary sensor."""
 
+    entity_description: UltimakerBinarySensorEntityDescription
     _attr_has_entity_name = True
 
     def __init__(
@@ -69,7 +71,7 @@ class UltimakerBinarySensor(BinarySensorEntity):
         entry: ConfigEntry,
     ) -> None:
         """Initialize the binary sensor."""
-        self.coordinator = coordinator
+        super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_device_info = DeviceInfo(
@@ -79,8 +81,8 @@ class UltimakerBinarySensor(BinarySensorEntity):
         )
 
     @property
-    def is_on(self) -> bool:
-        """Return the state of the binary sensor."""
+    def is_on(self) -> bool | None:
+        """Return true if the binary sensor is on."""
         return self.entity_description.value_fn(self.coordinator.data)
 
     @property

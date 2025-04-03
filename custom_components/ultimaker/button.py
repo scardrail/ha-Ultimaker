@@ -4,11 +4,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
+from homeassistant.components.button import (
+    ButtonEntity,
+    ButtonEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import UltimakerDataUpdateCoordinator
@@ -53,9 +57,10 @@ async def async_setup_entry(
         for description in BUTTON_TYPES
     )
 
-class UltimakerButton(ButtonEntity):
+class UltimakerButton(CoordinatorEntity[UltimakerDataUpdateCoordinator], ButtonEntity):
     """Representation of an Ultimaker button."""
 
+    entity_description: UltimakerButtonEntityDescription
     _attr_has_entity_name = True
 
     def __init__(
@@ -65,7 +70,7 @@ class UltimakerButton(ButtonEntity):
         entry: ConfigEntry,
     ) -> None:
         """Initialize the button."""
-        self.coordinator = coordinator
+        super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_device_info = DeviceInfo(
@@ -75,7 +80,7 @@ class UltimakerButton(ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Handle the button press."""
+        """Press the button."""
         await self.entity_description.press_fn(self.coordinator)
 
     @property

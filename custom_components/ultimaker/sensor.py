@@ -20,6 +20,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     ATTR_BED_TEMPERATURE,
@@ -117,9 +118,10 @@ async def async_setup_entry(
         for description in SENSOR_TYPES
     )
 
-class UltimakerSensor(SensorEntity):
+class UltimakerSensor(CoordinatorEntity[UltimakerDataUpdateCoordinator], SensorEntity):
     """Representation of an Ultimaker sensor."""
 
+    entity_description: UltimakerSensorEntityDescription
     _attr_has_entity_name = True
 
     def __init__(
@@ -129,7 +131,7 @@ class UltimakerSensor(SensorEntity):
         entry: ConfigEntry,
     ) -> None:
         """Initialize the sensor."""
-        self.coordinator = coordinator
+        super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_device_info = DeviceInfo(
