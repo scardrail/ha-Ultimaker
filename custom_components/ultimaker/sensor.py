@@ -13,8 +13,8 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
-    TEMP_CELSIUS,
     TIME_SECONDS,
+    UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
@@ -59,7 +59,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
     UltimakerSensorEntityDescription(
         key="bed_temperature",
         name="Bed Temperature",
-        native_unit_of_measurement=TEMP_CELSIUS,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data["printer"].get("bed_temperature", 0),
@@ -67,7 +67,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
     UltimakerSensorEntityDescription(
         key="bed_target",
         name="Bed Target Temperature",
-        native_unit_of_measurement=TEMP_CELSIUS,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data["printer"].get("bed_target", 0),
@@ -75,7 +75,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
     UltimakerSensorEntityDescription(
         key="hotend_temperature",
         name="Hotend Temperature",
-        native_unit_of_measurement=TEMP_CELSIUS,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data["printer"].get("hotend_temperature", 0),
@@ -83,7 +83,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
     UltimakerSensorEntityDescription(
         key="hotend_target",
         name="Hotend Target Temperature",
-        native_unit_of_measurement=TEMP_CELSIUS,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data["printer"].get("hotend_target", 0),

@@ -17,6 +17,7 @@ from .const import (
     API_SYSTEM,
     UPDATE_INTERVAL,
     PRINTER_STATE_OFFLINE,
+    DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
