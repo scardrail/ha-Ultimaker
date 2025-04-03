@@ -10,12 +10,13 @@ CONF_HOST: Final = "host"
 CONF_NAME: Final = "name"
 
 # API endpoints
-API_PRINTER: Final = "/printer"
-API_PRINT_JOB: Final = "/print_job"
-API_SYSTEM: Final = "/system"
-API_BED_TEMPERATURE: Final = "/printer/bed/temperature"
-API_HOTEND_TEMPERATURE: Final = "/printer/heads/0/extruders/0/hotend/temperature"
-API_PRINT_JOB_STATE: Final = "/print_job/state"
+API_PREFIX: Final = "/api/v1"
+API_PRINTER: Final = f"{API_PREFIX}/printer"
+API_PRINT_JOB: Final = f"{API_PREFIX}/print_job"
+API_SYSTEM: Final = f"{API_PREFIX}/system"
+API_BED_TEMPERATURE: Final = f"{API_PREFIX}/printer/bed/temperature"
+API_HOTEND_TEMPERATURE: Final = f"{API_PREFIX}/printer/heads/0/extruders/0/hotend/temperature"
+API_PRINT_JOB_STATE: Final = f"{API_PREFIX}/print_job/state"
 
 # Update interval
 UPDATE_INTERVAL: Final = 30  # seconds
