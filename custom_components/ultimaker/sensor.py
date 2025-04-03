@@ -161,18 +161,3 @@ class UltimakerSensor(CoordinatorEntity[UltimakerDataUpdateCoordinator], SensorE
             ATTR_LAYER: data["print_job"].get("layer"),
             ATTR_LAYER_COUNT: data["print_job"].get("layer_count"),
         }
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        return self.coordinator.last_update_success
-
-    async def async_added_to_hass(self) -> None:
-        """When entity is added to hass."""
-        await super().async_added_to_hass()
-        self.coordinator.async_add_listener(self.async_write_ha_state)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """When entity will be removed from hass."""
-        await super().async_will_remove_from_hass()
-        self.coordinator.async_remove_listener(self.async_write_ha_state)
