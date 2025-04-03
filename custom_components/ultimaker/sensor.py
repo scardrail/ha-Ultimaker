@@ -13,8 +13,8 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
-    TIME_SECONDS,
     UnitOfTemperature,
+    UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
@@ -91,14 +91,14 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
     UltimakerSensorEntityDescription(
         key="print_time",
         name="Print Time",
-        native_unit_of_measurement=TIME_SECONDS,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:clock-outline",
         value_fn=lambda data: data["print_job"].get("print_time", 0),
     ),
     UltimakerSensorEntityDescription(
         key="estimated_time",
         name="Estimated Time",
-        native_unit_of_measurement=TIME_SECONDS,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:clock-outline",
         value_fn=lambda data: data["print_job"].get("estimated_time", 0),
     ),
