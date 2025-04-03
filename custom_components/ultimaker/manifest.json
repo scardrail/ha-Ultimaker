@@ -1,0 +1,12 @@
+{
+  "domain": "ultimaker",
+  "name": "Ultimaker",
+  "documentation": "https://www.home-assistant.io/integrations/ultimaker",
+  "issue_tracker": "https://github.com/clews/home-assistant-ultimaker/issues",
+  "dependencies": [],
+  "codeowners": ["@yourusername"],
+  "requirements": ["aiohttp>=3.8.0"],
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "version": "1.0.0"
+}
