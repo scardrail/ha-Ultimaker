@@ -15,8 +15,13 @@ from .const import (
     API_PRINTER,
     API_PRINT_JOB,
     API_SYSTEM,
+    API_BED_TEMPERATURE,
+    API_HOTEND_TEMPERATURE,
+    API_PRINT_JOB_STATE,
+    PRINT_JOB_STATE_PAUSED,
+    PRINT_JOB_STATE_PRINTING,
+    PRINT_JOB_STATE_ABORTED,
     UPDATE_INTERVAL,
-    PRINTER_STATE_OFFLINE,
     DOMAIN,
 )
 
@@ -47,9 +52,9 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         """Update data via library."""
         try:
             async with async_timeout.timeout(10):
-                printer_data = await self._fetch_data("/printer")
-                print_job_data = await self._fetch_data("/print_job")
-                system_data = await self._fetch_data("/system")
+                printer_data = await self._fetch_data(API_PRINTER)
+                print_job_data = await self._fetch_data(API_PRINT_JOB)
+                system_data = await self._fetch_data(API_SYSTEM)
 
                 data = {
                     "printer": printer_data,
@@ -103,26 +108,26 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def async_pause_print(self) -> bool:
         """Pause the current print job."""
-        return await self._send_command("/print_job/state", data="pause")
+        return await self._send_command(API_PRINT_JOB_STATE, data=PRINT_JOB_STATE_PAUSED)
 
     async def async_resume_print(self) -> bool:
         """Resume the current print job."""
-        return await self._send_command("/print_job/state", data="print")
+        return await self._send_command(API_PRINT_JOB_STATE, data=PRINT_JOB_STATE_PRINTING)
 
     async def async_stop_print(self) -> bool:
         """Stop the current print job."""
-        return await self._send_command("/print_job/state", data="abort")
+        return await self._send_command(API_PRINT_JOB_STATE, data=PRINT_JOB_STATE_ABORTED)
 
     async def async_set_bed_temperature(self, temperature: float) -> bool:
         """Set the bed temperature."""
         return await self._send_command(
-            "/printer/bed/temperature",
+            API_BED_TEMPERATURE,
             data=temperature
         )
 
     async def async_set_hotend_temperature(self, temperature: float) -> bool:
         """Set the hotend temperature."""
         return await self._send_command(
-            "/printer/heads/0/extruders/0/hotend/temperature",
+            API_HOTEND_TEMPERATURE,
             data=temperature
         ) 

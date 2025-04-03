@@ -5,17 +5,35 @@ from typing import Final
 
 DOMAIN: Final = "ultimaker"
 
+# Configuration
 CONF_HOST: Final = "host"
 CONF_NAME: Final = "name"
 
-API_PRINTER: Final = "printer"
-API_PRINT_JOB: Final = "print_job"
-API_SYSTEM: Final = "system"
+# API endpoints
+API_PRINTER: Final = "/printer"
+API_PRINT_JOB: Final = "/print_job"
+API_SYSTEM: Final = "/system"
+API_BED_TEMPERATURE: Final = "/printer/bed/temperature"
+API_HOTEND_TEMPERATURE: Final = "/printer/heads/0/extruders/0/hotend/temperature"
+API_PRINT_JOB_STATE: Final = "/print_job/state"
 
-UPDATE_INTERVAL: Final = 30
+# Update interval
+UPDATE_INTERVAL: Final = 30  # seconds
 
+# Printer states
+PRINTER_STATE_IDLE: Final = "idle"
+PRINTER_STATE_PRINTING: Final = "printing"
+PRINTER_STATE_PAUSED: Final = "paused"
+PRINTER_STATE_ERROR: Final = "error"
 PRINTER_STATE_OFFLINE: Final = "offline"
 
+# Print job states
+PRINT_JOB_STATE_NONE: Final = "none"
+PRINT_JOB_STATE_PRINTING: Final = "print"
+PRINT_JOB_STATE_PAUSED: Final = "pause"
+PRINT_JOB_STATE_ABORTED: Final = "abort"
+
+# Attributes
 ATTR_BED_TEMPERATURE: Final = "bed_temperature"
 ATTR_BED_TARGET: Final = "bed_target"
 ATTR_HOTEND_TEMPERATURE: Final = "hotend_temperature"
@@ -27,4 +45,5 @@ ATTR_FILAMENT_USED: Final = "filament_used"
 ATTR_LAYER: Final = "layer"
 ATTR_LAYER_COUNT: Final = "layer_count"
 
+# Platforms
 PLATFORMS: Final = ["sensor", "binary_sensor", "button"]
