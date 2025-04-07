@@ -11,7 +11,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
-from .const import DOMAIN, PLATFORMS
+from .const import DOMAIN
 from .coordinator import UltimakerDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,8 +37,7 @@ PLATFORMS: list[Platform] = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Ultimaker from a config entry."""
-    session = async_get_clientsession(hass)
-    coordinator = UltimakerDataUpdateCoordinator(hass, session, entry.data[CONF_HOST])
+    coordinator = UltimakerDataUpdateCoordinator(hass, entry)
     
     await coordinator.async_config_entry_first_refresh()
     
