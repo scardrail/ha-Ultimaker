@@ -67,31 +67,25 @@ class UltimakerCamera(Camera):
         self._attr_unique_id = unique_id
         self._attr_device_info = device_info
         self._attr_icon = "mdi:printer-3d"
-        self._stream_url = stream_url
         self._fallback_url = fallback_url
-        self._use_fallback = False
         self.coordinator = coordinator
 
-        _LOGGER.debug("Initialized camera with stream URL: %s", self._stream_url)
+        _LOGGER.debug("Initialized camera with fallback URL: %s", self._fallback_url)
 
     async def stream_source(self) -> str | None:
         """Return the source of the stream."""
-        if self._use_fallback:
-            _LOGGER.debug("Using fallback stream URL: %s", self._fallback_url)
+        try:
+            if self.coordinator:
+                feed_url = self.coordinator.data.get("printer", {}).get("camera", {}).get("feed")
+                if isinstance(feed_url, str) and feed_url.startswith("http"):
+                    _LOGGER.debug("Using dynamic camera feed URL: %s", feed_url)
+                    return feed_url
+            
+            _LOGGER.warning("No valid camera feed URL found, using fallback URL: %s", self._fallback_url)
             return self._fallback_url
             
-        try:
-            # Vérifie si le flux principal est accessible
-            if self.coordinator and self.coordinator.data.get("printer", {}).get("camera", {}).get("feed"):
-                _LOGGER.debug("Using API stream URL: %s", self._stream_url)
-                return self._stream_url
-            else:
-                _LOGGER.debug("No camera feed in API response, switching to fallback URL")
-                self._use_fallback = True
-                return self._fallback_url
         except Exception as err:
-            _LOGGER.warning("Error accessing camera feed, switching to fallback URL: %s", err)
-            self._use_fallback = True
+            _LOGGER.warning("Error accessing camera feed, using fallback URL: %s", err)
             return self._fallback_url
 
     async def async_camera_image(self, width=None, height=None):
