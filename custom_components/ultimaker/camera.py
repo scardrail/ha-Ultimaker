@@ -66,7 +66,6 @@ class UltimakerCamera(MjpegCamera):
             name=name,
             still_image_url=still_url,
             mjpeg_url=mjpeg_url,
-            frame_interval=0.1,
             verify_ssl=False,
         )
 
