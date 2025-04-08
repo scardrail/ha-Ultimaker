@@ -89,18 +89,18 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                 if not isinstance(camera_data, dict):
                     camera_data = {}
 
-                # Traitement amélioré des données de caméra
+                # Traitement des données de caméra
                 if camera_data:
                     _LOGGER.debug("Camera data found: %s", camera_data)
-                    # Essayer de récupérer le flux
                     camera_feed = await self._fetch_data(API_CAMERA_FEED)
                     _LOGGER.debug("Camera feed data: %s", camera_feed)
-                    if isinstance(camera_feed, dict) and "feed" in camera_feed:
-                        camera_data["feed"] = camera_feed.get("feed")
+                    
+                    if isinstance(camera_feed, str) and camera_feed.startswith("http"):
+                        camera_data["feed"] = camera_feed
+                        _LOGGER.info("Camera feed URL found: %s", camera_feed)
+                    elif isinstance(camera_feed, dict) and "feed" in camera_feed:
+                        camera_data["feed"] = camera_feed["feed"]
                         _LOGGER.info("Camera feed URL found in dict: %s", camera_data["feed"])
-                    elif isinstance(camera_feed, str) and camera_feed.startswith("http"):
-                        camera_data["feed"] = camera_feed.strip()
-                        _LOGGER.info("Camera feed URL found as plain string: %s", camera_data["feed"])
                     else:
                         camera_data["feed"] = API_CAMERA_STREAM
                         _LOGGER.warning("Fallback to default stream path: %s", API_CAMERA_STREAM)
@@ -126,7 +126,7 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Error communicating with printer: %s", err, exc_info=True)
             raise UpdateFailed(f"Error communicating with printer: {err}") from err
 
-    async def _fetch_data(self, endpoint: str) -> dict[str, Any]:
+    async def _fetch_data(self, endpoint: str) -> Any:
         """Fetch data from the printer."""
         url = f"http://{self.host}{endpoint}"
         
@@ -135,31 +135,47 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("GET %s -> %s", url, response.status)
                 
                 if response.status == 200:
+                    content_type = response.headers.get("Content-Type", "")
                     text = await response.text()
                     _LOGGER.debug("Response text from %s: %s", endpoint, text)
                     
                     if not text:
                         _LOGGER.warning("Empty response from %s", endpoint)
                         return {}
-                        
+
+                    # Si le contenu est du JSON
+                    if "application/json" in content_type:
+                        try:
+                            data = json.loads(text)
+                            if isinstance(data, dict):
+                                return data
+                            elif isinstance(data, (int, float, str, bool)):
+                                return {"value": data}
+                            return {}
+                        except json.JSONDecodeError as err:
+                            _LOGGER.error(
+                                "Failed to decode JSON from %s: %s (text: %s)", endpoint, err, text
+                            )
+                            return {}
+                    
+                    # Si c'est du texte brut (comme l'URL de la caméra)
+                    elif "text/plain" in content_type or "text/html" in content_type:
+                        if text.strip().startswith("http"):
+                            return text.strip()
+                        return {"value": text.strip()}
+                    
+                    # Pour tout autre type de contenu, on essaie d'abord de parser comme JSON
                     try:
                         data = json.loads(text)
                         if isinstance(data, dict):
                             return data
-                        else:
-                            _LOGGER.warning(
-                                "Unexpected data type from %s: %s (%s)", endpoint, type(data), data
-                            )
-                            # Si c'est une valeur simple (nombre, chaîne), on la met dans un dict
-                            if isinstance(data, (int, float, str, bool)):
-                                return {"value": data}
-                            return {}
-                            
-                    except json.JSONDecodeError as err:
-                        _LOGGER.error(
-                            "Failed to decode JSON from %s: %s (text: %s)", endpoint, err, text
-                        )
-                        return {}
+                        elif isinstance(data, (int, float, str, bool)):
+                            return {"value": data}
+                    except json.JSONDecodeError:
+                        # Si ce n'est pas du JSON et que ça ressemble à une URL
+                        if text.strip().startswith("http"):
+                            return text.strip()
+                        return {"value": text.strip()}
                             
                 elif response.status == 404:
                     _LOGGER.debug(
