@@ -45,6 +45,52 @@ class UltimakerSensorEntityDescription(SensorEntityDescription):
 
 SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
     UltimakerSensorEntityDescription(
+        key="ip_address",
+        name="IP Address",
+        icon="mdi:ip-network",
+        value_fn=lambda data: data["system"].get("hostname", "unknown"),
+    ),
+    UltimakerSensorEntityDescription(
+        key="connection_mode",
+        name="Connection Mode",
+        icon="mdi:connection",
+        value_fn=lambda data: "LAN" if data["printer"]["network"]["ethernet"]["connected"] else "WiFi" if data["printer"]["network"]["wifi"]["connected"] else "Unknown",
+    ),
+    UltimakerSensorEntityDescription(
+        key="wifi_signal",
+        name="WiFi Signal",
+        native_unit_of_measurement=PERCENTAGE,
+        icon="mdi:wifi",
+        value_fn=lambda data: next((network["strength"] for network in data["printer"]["network"]["wifi_networks"] if network["ssid"] == data["printer"]["network"]["wifi"]["ssid"]), 0) if data["printer"]["network"]["wifi"]["connected"] else 0,
+    ),
+    UltimakerSensorEntityDescription(
+        key="ambient_temperature",
+        name="Ambient Temperature",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("ambient_temperature", {}).get("current", 0),
+    ),
+    UltimakerSensorEntityDescription(
+        key="print_start_time",
+        name="Print Start Time",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: data["print_job"].get("datetime_started"),
+    ),
+    UltimakerSensorEntityDescription(
+        key="print_end_time",
+        name="Print End Time",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: data["print_job"].get("datetime_finished"),
+    ),
+    UltimakerSensorEntityDescription(
+        key="print_speed",
+        name="Print Speed",
+        icon="mdi:printer-3d-nozzle",
+        native_unit_of_measurement="mm/s",
+        value_fn=lambda data: data["printer"]["heads"][0]["max_speed"]["x"] if data["printer"]["heads"] else 0,
+    ),
+    UltimakerSensorEntityDescription(
         key="status",
         name="Status",
         icon="mdi:printer-3d",
@@ -55,7 +101,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         name="Progress",
         native_unit_of_measurement=PERCENTAGE,
         icon="mdi:progress-clock",
-        value_fn=lambda data: data["print_job"].get("progress", 0),
+        value_fn=lambda data: data["print_job"].get("progress", 0) * 100 if data["print_job"].get("progress") is not None else 0,
     ),
     UltimakerSensorEntityDescription(
         key="bed_temperature",
@@ -63,7 +109,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["bed_temperature"].get("current", 0),
+        value_fn=lambda data: data["printer"]["bed"]["temperature"].get("current", 0),
     ),
     UltimakerSensorEntityDescription(
         key="bed_target",
@@ -71,7 +117,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["bed_temperature"].get("target", 0),
+        value_fn=lambda data: data["printer"]["bed"]["temperature"].get("target", 0),
     ),
     UltimakerSensorEntityDescription(
         key="hotend_temperature",
@@ -79,7 +125,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["hotend_temperature"].get("current", 0),
+        value_fn=lambda data: data["printer"]["heads"][0]["extruders"][0]["hotend"]["temperature"].get("current", 0) if data["printer"]["heads"] else 0,
     ),
     UltimakerSensorEntityDescription(
         key="hotend_target",
@@ -87,21 +133,23 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["hotend_temperature"].get("target", 0),
+        value_fn=lambda data: data["printer"]["heads"][0]["extruders"][0]["hotend"]["temperature"].get("target", 0) if data["printer"]["heads"] else 0,
     ),
     UltimakerSensorEntityDescription(
-        key="print_time",
-        name="Print Time",
+        key="time_elapsed",
+        name="Time Elapsed",
         native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
         icon="mdi:clock-outline",
-        value_fn=lambda data: data["print_job"].get("print_time", 0),
+        value_fn=lambda data: data["print_job"].get("time_elapsed", 0),
     ),
     UltimakerSensorEntityDescription(
-        key="estimated_time",
-        name="Estimated Time",
+        key="time_total",
+        name="Time Total",
         native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
         icon="mdi:clock-outline",
-        value_fn=lambda data: data["print_job"].get("estimated_time", 0),
+        value_fn=lambda data: data["print_job"].get("time_total", 0),
     ),
 )
 

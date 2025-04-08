@@ -2,16 +2,19 @@
 from __future__ import annotations
 
 import logging
+import asyncio
 from datetime import datetime, timedelta
 from typing import Any, Callable
+import aiohttp
+from aiohttp import BasicAuth, DigestAuth
+import async_timeout
+import json
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-import aiohttp
-import async_timeout
-import json
+from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from .const import (
     API_PRINTER,
@@ -22,12 +25,22 @@ from .const import (
     API_PRINT_JOB_STATE,
     API_CAMERA,
     API_CAMERA_FEED,
+    API_LED,
+    API_AUTH_REQUEST,
+    API_AUTH_CHECK,
+    API_AUTH_VERIFY,
     PRINT_JOB_STATE_PAUSED,
     PRINT_JOB_STATE_PRINTING,
     PRINT_JOB_STATE_ABORTED,
     UPDATE_INTERVAL,
     DOMAIN,
     API_CAMERA_STREAM,
+    AUTH_APP_NAME,
+    AUTH_USER_NAME,
+    AUTH_CHECK_INTERVAL,
+    AUTH_CHECK_TIMEOUT,
+    CONF_AUTH_ID,
+    CONF_AUTH_KEY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,6 +61,12 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         """Initialize."""
         self.host = entry.data["host"]
         self.session = async_get_clientsession(hass)
+        self.auth = None
+        self._auth_id = entry.data.get(CONF_AUTH_ID)
+        self._auth_key = entry.data.get(CONF_AUTH_KEY)
+        
+        if self._auth_id and self._auth_key:
+            self.auth = DigestAuth(self._auth_id, self._auth_key)
 
         super().__init__(
             hass,
@@ -210,16 +229,126 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         """Send a command to the printer."""
         url = f"http://{self.host}{endpoint}"
         
+        # Vérifier si nous avons besoin d'authentification
+        if method in ["PUT", "POST", "DELETE"]:
+            if not self.auth:
+                auth_result = await self._request_auth()
+                if not auth_result:
+                    _LOGGER.error("Failed to authenticate with printer")
+                    return False
+        
         try:
             if isinstance(data, dict):
-                async with self.session.request(method, url, json=data, headers=HEADERS) as response:
+                async with self.session.request(
+                    method, 
+                    url, 
+                    json=data, 
+                    headers=HEADERS,
+                    auth=self.auth
+                ) as response:
+                    if response.status == 401:
+                        # Essayer de renouveler l'authentification
+                        auth_result = await self._request_auth()
+                        if not auth_result:
+                            return False
+                        # Réessayer la requête avec la nouvelle authentification
+                        async with self.session.request(
+                            method, 
+                            url, 
+                            json=data, 
+                            headers=HEADERS,
+                            auth=self.auth
+                        ) as retry_response:
+                            return retry_response.status in (200, 204)
                     return response.status in (200, 204)
             else:
                 # Pour les cas où data n'est pas un dict (ex: température qui est un float)
-                async with self.session.request(method, url, json={"temperature": data}, headers=HEADERS) as response:
+                async with self.session.request(
+                    method, 
+                    url, 
+                    json={"temperature": data}, 
+                    headers=HEADERS,
+                    auth=self.auth
+                ) as response:
+                    if response.status == 401:
+                        # Essayer de renouveler l'authentification
+                        auth_result = await self._request_auth()
+                        if not auth_result:
+                            return False
+                        # Réessayer la requête avec la nouvelle authentification
+                        async with self.session.request(
+                            method, 
+                            url, 
+                            json={"temperature": data}, 
+                            headers=HEADERS,
+                            auth=self.auth
+                        ) as retry_response:
+                            return retry_response.status in (200, 204)
                     return response.status in (200, 204)
         except aiohttp.ClientError as err:
             _LOGGER.error("Error sending command to %s: %s", url, err)
+            return False
+
+    async def _request_auth(self) -> bool:
+        """Request authentication from the printer."""
+        url = f"http://{self.host}{API_AUTH_REQUEST}"
+        try:
+            # 1. Demander l'authentification
+            async with self.session.post(
+                url,
+                data={
+                    "application": AUTH_APP_NAME,
+                    "user": AUTH_USER_NAME
+                },
+                headers=HEADERS
+            ) as response:
+                if response.status != 200:
+                    _LOGGER.error("Failed to request authentication: %s", response.status)
+                    return False
+                
+                auth_data = await response.json()
+                auth_id = auth_data.get("id")
+                auth_key = auth_data.get("key")
+                
+                if not auth_id or not auth_key:
+                    _LOGGER.error("Invalid authentication response: %s", auth_data)
+                    return False
+                
+                # 2. Attendre l'autorisation
+                check_url = f"http://{self.host}{API_AUTH_CHECK}/{auth_id}"
+                start_time = datetime.now()
+                
+                while (datetime.now() - start_time).total_seconds() < AUTH_CHECK_TIMEOUT:
+                    async with self.session.get(check_url, headers=HEADERS) as check_response:
+                        if check_response.status != 200:
+                            await asyncio.sleep(AUTH_CHECK_INTERVAL)
+                            continue
+                        
+                        check_data = await check_response.json()
+                        if check_data.get("message") == "authorized":
+                            # Mettre à jour l'authentification
+                            self.auth = DigestAuth(auth_id, auth_key)
+                            # Sauvegarder les identifiants
+                            self.hass.config_entries.async_update_entry(
+                                self._entry,
+                                data={
+                                    **self._entry.data,
+                                    CONF_AUTH_ID: auth_id,
+                                    CONF_AUTH_KEY: auth_key,
+                                },
+                            )
+                            return True
+                        elif check_data.get("message") == "unauthorized":
+                            _LOGGER.error("Authorization rejected by user")
+                            return False
+                        
+                        await asyncio.sleep(AUTH_CHECK_INTERVAL)
+                
+                _LOGGER.error("Authorization timeout")
+                return False
+                
+        except Exception as err:
+            _LOGGER.error("Error during authentication: %s", err)
             return False
 
     async def async_pause_print(self) -> bool:
@@ -246,4 +375,11 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         return await self._send_command(
             API_HOTEND_TEMPERATURE,
             data=temperature
+        )
+
+    async def async_set_led(self, led_data: dict[str, Any]) -> bool:
+        """Set the LED state."""
+        return await self._send_command(
+            API_LED,
+            data=led_data
         ) 

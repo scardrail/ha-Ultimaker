@@ -8,6 +8,8 @@ DOMAIN: Final = "ultimaker"
 # Configuration
 CONF_HOST: Final = "host"
 CONF_NAME: Final = "name"
+CONF_AUTH_ID: Final = "auth_id"
+CONF_AUTH_KEY: Final = "auth_key"
 
 # API endpoints
 API_PREFIX: Final = "/api/v1"
@@ -21,9 +23,19 @@ API_CAMERA: Final = f"{API_PREFIX}/camera"
 API_CAMERA_FEED: Final = f"{API_PREFIX}/camera/feed"
 API_CAMERA_SNAPSHOT: Final = f"{API_PREFIX}/camera/0/snapshot"
 API_CAMERA_STREAM: Final = f"{API_PREFIX}/camera/0/stream"
+API_LED: Final = f"{API_PREFIX}/printer/led"
+API_AUTH_REQUEST: Final = f"{API_PREFIX}/auth/request"
+API_AUTH_CHECK: Final = f"{API_PREFIX}/auth/check"
+API_AUTH_VERIFY: Final = f"{API_PREFIX}/auth/verify"
 
 # Update interval
 UPDATE_INTERVAL: Final = 10  # seconds
+
+# Authentication
+AUTH_APP_NAME: Final = "MyLabManager"
+AUTH_USER_NAME: Final = "HDFLabCesi"
+AUTH_CHECK_INTERVAL: Final = 2  # seconds
+AUTH_CHECK_TIMEOUT: Final = 60  # seconds
 
 # Printer states
 PRINTER_STATE_IDLE: Final = "idle"

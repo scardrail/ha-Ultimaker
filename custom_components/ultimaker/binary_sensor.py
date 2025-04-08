@@ -26,6 +26,18 @@ class UltimakerBinarySensorEntityDescription(BinarySensorEntityDescription):
 
 BINARY_SENSOR_TYPES: tuple[UltimakerBinarySensorEntityDescription, ...] = (
     UltimakerBinarySensorEntityDescription(
+        key="camera",
+        name="Camera",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        value_fn=lambda data: bool(data["printer"].get("camera", {}).get("feed")),
+    ),
+    UltimakerBinarySensorEntityDescription(
+        key="light",
+        name="Light",
+        device_class=BinarySensorDeviceClass.LIGHT,
+        value_fn=lambda data: bool(data["printer"]["led"]["brightness"] > 0),
+    ),
+    UltimakerBinarySensorEntityDescription(
         key="printing",
         name="Printing",
         device_class=BinarySensorDeviceClass.RUNNING,

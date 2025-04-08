@@ -42,6 +42,18 @@ BUTTON_TYPES: tuple[UltimakerButtonEntityDescription, ...] = (
         icon="mdi:stop",
         press_fn=lambda coordinator: coordinator.async_stop_print(),
     ),
+    UltimakerButtonEntityDescription(
+        key="light_on",
+        name="Light On",
+        icon="mdi:lightbulb-on",
+        press_fn=lambda coordinator: coordinator.async_set_led({"brightness": 100, "saturation": 0, "hue": 0}),
+    ),
+    UltimakerButtonEntityDescription(
+        key="light_off",
+        name="Light Off",
+        icon="mdi:lightbulb-off",
+        press_fn=lambda coordinator: coordinator.async_set_led({"brightness": 0, "saturation": 0, "hue": 0}),
+    ),
 )
 
 async def async_setup_entry(
