@@ -20,13 +20,13 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Ultimaker camera based on a config entry."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
-    
+    coordinator: UltimakerDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+
     host = entry.data["host"]
     mjpeg_url = f"http://{host}:8080/?action=stream"
-    
+
     _LOGGER.info("Setting up Ultimaker camera with MJPEG URL: %s", mjpeg_url)
-    
+
     camera = UltimakerCamera(
         name=f"{entry.data['name']} Camera",
         mjpeg_url=mjpeg_url,
@@ -36,8 +36,9 @@ async def async_setup_entry(
             name=entry.data["name"],
             manufacturer="Ultimaker",
         ),
+        coordinator=coordinator,
     )
-    
+
     async_add_entities([camera])
     _LOGGER.info("Added camera entity for Ultimaker with stream URL: %s", mjpeg_url)
 
@@ -53,25 +54,26 @@ class UltimakerCamera(Camera):
         mjpeg_url: str,
         unique_id: str,
         device_info: DeviceInfo | None = None,
+        coordinator: UltimakerDataUpdateCoordinator | None = None,
     ) -> None:
         """Initialize Ultimaker camera component."""
         super().__init__()
-        
+
         self._attr_name = name
         self._attr_unique_id = unique_id
         self._attr_device_info = device_info
         self._attr_icon = "mdi:printer-3d"
         self._mjpeg_url = mjpeg_url
-        
+        self.coordinator = coordinator  # Ajout du coordinator
+
         _LOGGER.debug("Initialized camera with MJPEG URL: %s", mjpeg_url)
 
     async def stream_source(self) -> str | None:
         """Return the source of the stream."""
         _LOGGER.debug("Returning stream source: %s", self._mjpeg_url)
         return self._mjpeg_url
-        
-    async def async_camera_image(self, width = None, height = None):
+
+    async def async_camera_image(self, width=None, height=None):
         """Return a still image from the camera."""
-        # Nous n'implémentons pas cette méthode, car nous utilisons uniquement le flux MJPEG
-        # Home Assistant peut extraire une image du flux si nécessaire
+        # Pas d'implémentation pour l'instant, car on utilise MJPEG
         return None
