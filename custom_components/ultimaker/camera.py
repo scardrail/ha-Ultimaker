@@ -9,7 +9,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, API_CAMERA_SNAPSHOT, API_CAMERA_STREAM
+from .const import DOMAIN
 from .coordinator import UltimakerDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,28 +21,15 @@ async def async_setup_entry(
 ) -> None:
     """Set up Ultimaker camera based on a config entry."""
     coordinator: UltimakerDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities([UltimakerCamera(coordinator, entry)])
+    _LOGGER.info("Added camera entity for Ultimaker")
 
-    # Vérifier si la caméra est disponible dans les données de l'imprimante
-    printer_data = coordinator.data.get("printer", {})
-    _LOGGER.debug("Printer data for camera setup: %s", printer_data)
-    
-    if "camera" in printer_data and printer_data.get("camera", {}).get("feed"):
-        _LOGGER.debug("Camera feed found: %s", printer_data["camera"]["feed"])
-        entities = [
-            UltimakerStreamCamera(coordinator, entry),
-            UltimakerSnapshotCamera(coordinator, entry),
-        ]
-        async_add_entities(entities)
-        _LOGGER.info("Added camera entities for Ultimaker")
-    else:
-        _LOGGER.warning("No camera feed found in printer data")
-
-class UltimakerStreamCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], Camera):
-    """Representation of an Ultimaker camera stream."""
+class UltimakerCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], Camera):
+    """Representation of an Ultimaker camera."""
 
     _attr_has_entity_name = True
     _attr_supported_features = CameraEntityFeature.STREAM
-    _attr_name = "Camera Stream"
+    _attr_name = "Camera"
     _attr_icon = "mdi:printer-3d"
     _attr_brand = "Ultimaker"
 
@@ -55,25 +42,20 @@ class UltimakerStreamCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], C
         super().__init__(coordinator)
         Camera.__init__(self)
         
-        self._attr_unique_id = f"{entry.entry_id}_camera_stream"
+        self._attr_unique_id = f"{entry.entry_id}_camera"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.data["name"],
             manufacturer="Ultimaker",
         )
         self._host = entry.data["host"]
-        _LOGGER.debug("Initialized stream camera for %s", self._host)
+        self._mjpeg_url = f"http://{self._host}:8080/?action=stream"
+        _LOGGER.debug("Initialized camera for %s with MJPEG URL: %s", self._host, self._mjpeg_url)
 
     @property
     def available(self) -> bool:
         """Return if camera is available."""
-        is_available = (
-            self.coordinator.data.get("printer", {})
-            .get("camera", {})
-            .get("feed") is not None
-        )
-        _LOGGER.debug("Stream camera available: %s", is_available)
-        return is_available
+        return self.coordinator.last_update_success
 
     @property
     def is_streaming(self) -> bool:
@@ -84,137 +66,46 @@ class UltimakerStreamCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], C
     def is_recording(self) -> bool:
         """Return true if the device is recording."""
         return False
-
-    @property
-    def use_stream_for_stills(self) -> bool:
-        """Return true if the camera should use the stream for stills."""
-        return True
 
     async def stream_source(self) -> str | None:
         """Return the source of the stream."""
         if not self.available:
-            _LOGGER.debug("Stream not available")
             return None
-        
-        # Essayer d'abord l'API de flux direct si disponible
-        direct_url = f"http://{self._host}{API_CAMERA_STREAM}"
-        _LOGGER.debug("Trying direct stream URL: %s", direct_url)
-        
-        try:
-            async with self.coordinator.session.head(
-                direct_url, 
-                timeout=5,
-                allow_redirects=True
-            ) as response:
-                if response.status == 200:
-                    _LOGGER.debug("Direct stream URL available: %s", direct_url)
-                    return direct_url
-                _LOGGER.debug("Direct stream unavailable (status %s), trying feed URL", response.status)
-        except Exception as err:
-            _LOGGER.debug("Error checking direct stream URL: %s", err)
-        
-        # Sinon, utiliser l'URL du flux fournie par l'API
-        camera_feed = (
-            self.coordinator.data.get("printer", {})
-            .get("camera", {})
-            .get("feed")
-        )
-        
-        if camera_feed:
-            url = f"http://{self._host}{camera_feed}"
-            _LOGGER.debug("Using feed URL: %s", url)
-            return url
-            
-        _LOGGER.debug("No camera feed URLs found")
-        return None
-
-class UltimakerSnapshotCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], Camera):
-    """Representation of an Ultimaker camera snapshot."""
-
-    _attr_has_entity_name = True
-    _attr_name = "Camera Snapshot"
-    _attr_icon = "mdi:printer-3d"
-    _attr_brand = "Ultimaker"
-
-    def __init__(
-        self,
-        coordinator: UltimakerDataUpdateCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        """Initialize the camera."""
-        super().__init__(coordinator)
-        Camera.__init__(self)
-        
-        self._attr_unique_id = f"{entry.entry_id}_camera_snapshot"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data["name"],
-            manufacturer="Ultimaker",
-        )
-        self._host = entry.data["host"]
-        _LOGGER.debug("Initialized snapshot camera for %s", self._host)
-
-    @property
-    def available(self) -> bool:
-        """Return if camera is available."""
-        is_available = (
-            self.coordinator.data.get("printer", {})
-            .get("camera", {})
-            .get("feed") is not None
-        )
-        _LOGGER.debug("Snapshot camera available: %s", is_available)
-        return is_available
-
-    @property
-    def is_streaming(self) -> bool:
-        """Return true if the device is streaming."""
-        return self.available
-
-    @property
-    def is_recording(self) -> bool:
-        """Return true if the device is recording."""
-        return False
+        return self._mjpeg_url
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
     ) -> bytes | None:
         """Return a still image from the camera."""
         if not self.available:
-            _LOGGER.debug("Snapshot not available")
             return None
 
         try:
-            url = f"http://{self._host}{API_CAMERA_SNAPSHOT}"
-            _LOGGER.debug("Getting snapshot from: %s", url)
-            
             async with self.coordinator.session.get(
-                url,
-                headers={"Accept": "image/jpeg"},
-                timeout=10,
+                self._mjpeg_url,
+                headers={"Accept": "image/jpeg, multipart/x-mixed-replace"},
+                timeout=5,
             ) as response:
-                _LOGGER.debug("Snapshot response status: %s", response.status)
-                _LOGGER.debug("Snapshot response headers: %s", response.headers)
-                
-                if response.status == 200:
-                    content_type = response.headers.get("Content-Type", "")
-                    _LOGGER.debug("Snapshot content type: %s", content_type)
-                    
-                    if "image" in content_type:
-                        image_data = await response.read()
-                        _LOGGER.debug("Successfully got snapshot, size: %d bytes", len(image_data))
-                        return image_data
-                    else:
-                        _LOGGER.error("Unexpected content type: %s", content_type)
+                if response.status != 200:
+                    _LOGGER.error("Failed to get camera image, status: %s", response.status)
+                    return None
+
+                # Pour un flux MJPEG, nous devons lire jusqu'à trouver une image complète
+                content_type = response.headers.get("Content-Type", "")
+                if "multipart/x-mixed-replace" in content_type:
+                    # Lire le début du flux pour obtenir la première image
+                    chunk = await response.content.read(100000)
+                    if chunk:
+                        # Chercher le début et la fin d'une image JPEG
+                        start = chunk.find(b"\xff\xd8")
+                        end = chunk.find(b"\xff\xd9")
+                        if start != -1 and end != -1:
+                            return chunk[start:end+2]
                 else:
-                    _LOGGER.error("Failed to get snapshot, status: %s", response.status)
-                    
-                    # Essayer de lire le corps de la réponse pour le diagnostic
-                    try:
-                        error_text = await response.text()
-                        _LOGGER.error("Error response: %s", error_text[:200])
-                    except Exception as text_err:
-                        _LOGGER.error("Could not read error response: %s", text_err)
+                    # Si ce n'est pas un flux multipart, essayer de lire directement
+                    return await response.read()
+
         except Exception as err:
             _LOGGER.error("Error getting camera image: %s", err, exc_info=True)
         
-        return None 
+        return None
