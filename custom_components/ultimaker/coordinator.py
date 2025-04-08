@@ -95,15 +95,15 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                     # Essayer de récupérer le flux
                     camera_feed = await self._fetch_data(API_CAMERA_FEED)
                     _LOGGER.debug("Camera feed data: %s", camera_feed)
-                    
                     if isinstance(camera_feed, dict) and "feed" in camera_feed:
                         camera_data["feed"] = camera_feed.get("feed")
-                        _LOGGER.info("Camera feed URL found: %s", camera_data["feed"])
+                        _LOGGER.info("Camera feed URL found in dict: %s", camera_data["feed"])
+                    elif isinstance(camera_feed, str) and camera_feed.startswith("http"):
+                        camera_data["feed"] = camera_feed.strip()
+                        _LOGGER.info("Camera feed URL found as plain string: %s", camera_data["feed"])
                     else:
-                        # Si nous avons des données de caméra mais pas d'URL de flux spécifique,
-                        # on peut utiliser un chemin prédéfini qui fonctionne pour certains modèles
-                        camera_data["feed"] = API_CAMERA_STREAM  
-                        _LOGGER.info("Using default camera stream path: %s", API_CAMERA_STREAM)
+                        camera_data["feed"] = API_CAMERA_STREAM
+                        _LOGGER.warning("Fallback to default stream path: %s", API_CAMERA_STREAM)
                 else:
                     _LOGGER.debug("No camera data available from API")
 
