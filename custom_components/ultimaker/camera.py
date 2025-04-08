@@ -50,8 +50,6 @@ async def async_setup_entry(
 class UltimakerCamera(MjpegCamera):
     """Camera class for Ultimaker."""
 
-    _attr_supported_features = CameraEntityFeature.STREAM
-
     def __init__(
         self,
         name: str,
