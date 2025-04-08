@@ -6,7 +6,6 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Any, Callable
 import aiohttp
-from aiohttp_digest import DigestAuth
 import async_timeout
 import json
 
@@ -72,7 +71,7 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         self._session = async_get_clientsession(hass)
         self._auth = None
         if self._auth_id and self._auth_key:
-            self._auth = DigestAuth(self._auth_id, self._auth_key)
+            self._auth = aiohttp.auth.DigestAuth(self._auth_id, self._auth_key)
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Update data via library."""
@@ -237,7 +236,7 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                     self._auth_key = result.get("key")
                     
                     if self._auth_id and self._auth_key:
-                        self._auth = DigestAuth(self._auth_id, self._auth_key)
+                        self._auth = aiohttp.auth.DigestAuth(self._auth_id, self._auth_key)
                         
                         # Save the credentials
                         new_data = dict(self.config_entry.data)
