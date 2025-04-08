@@ -7,7 +7,7 @@ import asyncio
 from typing import cast
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
-from homeassistant.components.mjpeg.camera import MjpegCamera, filter_urllib3_logging
+from homeassistant.components.mjpeg.camera import MjpegCamera
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
@@ -18,9 +18,6 @@ from .const import DOMAIN
 from .coordinator import UltimakerDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-
-# Filtrer les logs urllib3 trop verbeux
-filter_urllib3_logging()
 
 async def async_setup_entry(
     hass: HomeAssistant,
