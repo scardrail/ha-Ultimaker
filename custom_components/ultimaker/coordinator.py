@@ -159,68 +159,81 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         url = f"http://{self._host}{endpoint}"
         
         try:
-            async with self._session.get(url, headers=HEADERS) as response:
-                _LOGGER.debug("GET %s -> %s", url, response.status)
-                
-                if response.status == 200:
-                    content_type = response.headers.get("Content-Type", "")
-                    text = await response.text()
-                    _LOGGER.debug("Response text from %s: %s", endpoint, text)
-                    
-                    if not text:
-                        _LOGGER.warning("Empty response from %s", endpoint)
-                        return {}
-
-                    # Si le contenu est du JSON
-                    if "application/json" in content_type:
-                        try:
-                            data = json.loads(text)
-                            if isinstance(data, dict):
-                                return data
-                            elif isinstance(data, (int, float, str, bool)):
-                                return {"value": data}
-                            return {}
-                        except json.JSONDecodeError as err:
-                            _LOGGER.error(
-                                "Failed to decode JSON from %s: %s (text: %s)", endpoint, err, text
-                            )
-                            return {}
-                    
-                    # Si c'est du texte brut (comme l'URL de la caméra)
-                    elif "text/plain" in content_type or "text/html" in content_type:
-                        if text.strip().startswith("http"):
-                            return text.strip()
-                        return {"value": text.strip()}
-                    
-                    # Pour tout autre type de contenu, on essaie d'abord de parser comme JSON
-                    try:
-                        data = json.loads(text)
-                        if isinstance(data, dict):
-                            return data
-                        elif isinstance(data, (int, float, str, bool)):
-                            return {"value": data}
-                    except json.JSONDecodeError:
-                        # Si ce n'est pas du JSON et que ça ressemble à une URL
-                        if text.strip().startswith("http"):
-                            return text.strip()
-                        return {"value": text.strip()}
-                            
-                elif response.status == 404:
-                    _LOGGER.debug(
-                        "Resource not found at %s: %s", url, response.status
-                    )
-                    return {}
-                else:
-                    _LOGGER.error(
-                        "Error fetching data from %s: %s", url, response.status
-                    )
-                    return {}
+            if self._auth:
+                async with self._auth.session(self._session) as auth_session:
+                    async with auth_session.get(url, headers=HEADERS) as response:
+                        if response.status == 401:
+                            await self._request_auth()
+                            return await self._fetch_data(endpoint)
+                        return await self._process_response(response, endpoint)
+            else:
+                async with self._session.get(url, headers=HEADERS) as response:
+                    if response.status == 401:
+                        await self._request_auth()
+                        return await self._fetch_data(endpoint)
+                    return await self._process_response(response, endpoint)
                     
         except aiohttp.ClientError as err:
             _LOGGER.error("Error fetching data from %s: %s", url, err)
             return {}
         except Exception as err:
             _LOGGER.error("Unexpected error fetching data from %s: %s", url, err, exc_info=True)
+            return {}
+
+    async def _process_response(self, response: aiohttp.ClientResponse, endpoint: str) -> Any:
+        """Process the response from the printer."""
+        if response.status == 200:
+            content_type = response.headers.get("Content-Type", "")
+            text = await response.text()
+            _LOGGER.debug("Response text from %s: %s", endpoint, text)
+            
+            if not text:
+                _LOGGER.warning("Empty response from %s", endpoint)
+                return {}
+
+            # Si le contenu est du JSON
+            if "application/json" in content_type:
+                try:
+                    data = json.loads(text)
+                    if isinstance(data, dict):
+                        return data
+                    elif isinstance(data, (int, float, str, bool)):
+                        return {"value": data}
+                    return {}
+                except json.JSONDecodeError as err:
+                    _LOGGER.error(
+                        "Failed to decode JSON from %s: %s (text: %s)", endpoint, err, text
+                    )
+                    return {}
+            
+            # Si c'est du texte brut (comme l'URL de la caméra)
+            elif "text/plain" in content_type or "text/html" in content_type:
+                if text.strip().startswith("http"):
+                    return text.strip()
+                return {"value": text.strip()}
+            
+            # Pour tout autre type de contenu, on essaie d'abord de parser comme JSON
+            try:
+                data = json.loads(text)
+                if isinstance(data, dict):
+                    return data
+                elif isinstance(data, (int, float, str, bool)):
+                    return {"value": data}
+            except json.JSONDecodeError:
+                # Si ce n'est pas du JSON et que ça ressemble à une URL
+                if text.strip().startswith("http"):
+                    return text.strip()
+                return {"value": text.strip()}
+                    
+        elif response.status == 404:
+            _LOGGER.debug(
+                "Resource not found at %s: %s", endpoint, response.status
+            )
+            return {}
+        else:
+            _LOGGER.error(
+                "Error fetching data from %s: %s", endpoint, response.status
+            )
             return {}
 
     async def _request_auth(self) -> None:
@@ -232,25 +245,58 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
             async with self._session.post(url, json=data) as response:
                 if response.status == 200:
                     result = await response.json()
-                    self._auth_id = result.get("id")
-                    self._auth_key = result.get("key")
+                    auth_id = result.get("id")
+                    auth_key = result.get("key")
                     
-                    if self._auth_id and self._auth_key:
-                        self._auth = aiohttp.auth.DigestAuth(self._auth_id, self._auth_key)
-                        
-                        # Save the credentials
-                        new_data = dict(self.config_entry.data)
-                        new_data[CONF_AUTH_ID] = self._auth_id
-                        new_data[CONF_AUTH_KEY] = self._auth_key
-                        self.hass.config_entries.async_update_entry(
-                            self.config_entry, data=new_data
-                        )
-                    else:
+                    if not auth_id or not auth_key:
                         raise ConfigEntryAuthFailed("Failed to get authentication credentials")
+
+                    # Attendre l'autorisation physique
+                    authorized = await self._wait_for_auth_approval(auth_id)
+                    if not authorized:
+                        raise ConfigEntryAuthFailed("Authorization request timed out or was rejected")
+
+                    # Mettre à jour les credentials
+                    self._auth_id = auth_id
+                    self._auth_key = auth_key
+                    self._auth = aiohttp.auth.DigestAuth(self._auth_id, self._auth_key)
+                    
+                    # Sauvegarder les credentials
+                    new_data = dict(self.config_entry.data)
+                    new_data[CONF_AUTH_ID] = self._auth_id
+                    new_data[CONF_AUTH_KEY] = self._auth_key
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry, data=new_data
+                    )
                 else:
                     raise ConfigEntryAuthFailed(f"Authentication request failed with status {response.status}")
         except aiohttp.ClientError as err:
             raise ConfigEntryAuthFailed(f"Error requesting authentication: {err}")
+
+    async def _wait_for_auth_approval(self, auth_id: str) -> bool:
+        """Wait for physical authorization on the printer."""
+        check_url = f"http://{self._host}{API_AUTH_CHECK}/{auth_id}"
+        start_time = datetime.now()
+        
+        while (datetime.now() - start_time).total_seconds() < AUTH_CHECK_TIMEOUT:
+            try:
+                async with self._session.get(check_url) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        if result.get("message") == "authorized":
+                            _LOGGER.info("Authorization approved on printer")
+                            return True
+                        elif result.get("message") == "unauthorized":
+                            _LOGGER.error("Authorization rejected on printer")
+                            return False
+                    
+                    await asyncio.sleep(AUTH_CHECK_INTERVAL)
+            except aiohttp.ClientError as err:
+                _LOGGER.error("Error checking authorization status: %s", err)
+                await asyncio.sleep(AUTH_CHECK_INTERVAL)
+                
+        _LOGGER.error("Authorization request timed out")
+        return False
 
     async def _send_command(self, endpoint: str, method: str = "GET", data: dict | None = None) -> Any:
         """Send command to the printer."""
