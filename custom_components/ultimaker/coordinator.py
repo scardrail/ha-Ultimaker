@@ -27,6 +27,7 @@ from .const import (
     PRINT_JOB_STATE_ABORTED,
     UPDATE_INTERVAL,
     DOMAIN,
+    API_CAMERA_STREAM,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,11 +89,23 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                 if not isinstance(camera_data, dict):
                     camera_data = {}
 
-                # Si nous avons des données de caméra, essayons de récupérer le flux
+                # Traitement amélioré des données de caméra
                 if camera_data:
+                    _LOGGER.debug("Camera data found: %s", camera_data)
+                    # Essayer de récupérer le flux
                     camera_feed = await self._fetch_data(API_CAMERA_FEED)
-                    if isinstance(camera_feed, dict):
+                    _LOGGER.debug("Camera feed data: %s", camera_feed)
+                    
+                    if isinstance(camera_feed, dict) and "feed" in camera_feed:
                         camera_data["feed"] = camera_feed.get("feed")
+                        _LOGGER.info("Camera feed URL found: %s", camera_data["feed"])
+                    else:
+                        # Si nous avons des données de caméra mais pas d'URL de flux spécifique,
+                        # on peut utiliser un chemin prédéfini qui fonctionne pour certains modèles
+                        camera_data["feed"] = API_CAMERA_STREAM  
+                        _LOGGER.info("Using default camera stream path: %s", API_CAMERA_STREAM)
+                else:
+                    _LOGGER.debug("No camera data available from API")
 
                 data = {
                     "printer": {

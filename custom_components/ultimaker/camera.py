@@ -9,7 +9,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, API_CAMERA_SNAPSHOT, API_CAMERA_STREAM
 from .coordinator import UltimakerDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -95,17 +95,37 @@ class UltimakerStreamCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], C
         if not self.available:
             _LOGGER.debug("Stream not available")
             return None
-            
+        
+        # Essayer d'abord l'API de flux direct si disponible
+        direct_url = f"http://{self._host}{API_CAMERA_STREAM}"
+        _LOGGER.debug("Trying direct stream URL: %s", direct_url)
+        
+        try:
+            async with self.coordinator.session.head(
+                direct_url, 
+                timeout=5,
+                allow_redirects=True
+            ) as response:
+                if response.status == 200:
+                    _LOGGER.debug("Direct stream URL available: %s", direct_url)
+                    return direct_url
+                _LOGGER.debug("Direct stream unavailable (status %s), trying feed URL", response.status)
+        except Exception as err:
+            _LOGGER.debug("Error checking direct stream URL: %s", err)
+        
+        # Sinon, utiliser l'URL du flux fournie par l'API
         camera_feed = (
             self.coordinator.data.get("printer", {})
             .get("camera", {})
             .get("feed")
         )
+        
         if camera_feed:
             url = f"http://{self._host}{camera_feed}"
-            _LOGGER.debug("Stream URL: %s", url)
+            _LOGGER.debug("Using feed URL: %s", url)
             return url
-        _LOGGER.debug("No camera feed found")
+            
+        _LOGGER.debug("No camera feed URLs found")
         return None
 
 class UltimakerSnapshotCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator], Camera):
@@ -164,17 +184,37 @@ class UltimakerSnapshotCamera(CoordinatorEntity[UltimakerDataUpdateCoordinator],
             return None
 
         try:
-            url = f"http://{self._host}/camera/0/snapshot"
+            url = f"http://{self._host}{API_CAMERA_SNAPSHOT}"
             _LOGGER.debug("Getting snapshot from: %s", url)
+            
             async with self.coordinator.session.get(
                 url,
                 headers={"Accept": "image/jpeg"},
+                timeout=10,
             ) as response:
+                _LOGGER.debug("Snapshot response status: %s", response.status)
+                _LOGGER.debug("Snapshot response headers: %s", response.headers)
+                
                 if response.status == 200:
-                    _LOGGER.debug("Successfully got snapshot")
-                    return await response.read()
-                _LOGGER.error("Failed to get snapshot, status: %s", response.status)
+                    content_type = response.headers.get("Content-Type", "")
+                    _LOGGER.debug("Snapshot content type: %s", content_type)
+                    
+                    if "image" in content_type:
+                        image_data = await response.read()
+                        _LOGGER.debug("Successfully got snapshot, size: %d bytes", len(image_data))
+                        return image_data
+                    else:
+                        _LOGGER.error("Unexpected content type: %s", content_type)
+                else:
+                    _LOGGER.error("Failed to get snapshot, status: %s", response.status)
+                    
+                    # Essayer de lire le corps de la réponse pour le diagnostic
+                    try:
+                        error_text = await response.text()
+                        _LOGGER.error("Error response: %s", error_text[:200])
+                    except Exception as text_err:
+                        _LOGGER.error("Could not read error response: %s", text_err)
         except Exception as err:
-            _LOGGER.error("Error getting camera image: %s", err)
-            return None
+            _LOGGER.error("Error getting camera image: %s", err, exc_info=True)
+        
         return None 

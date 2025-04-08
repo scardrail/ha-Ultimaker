@@ -51,4 +51,4 @@ ATTR_LAYER: Final = "layer"
 ATTR_LAYER_COUNT: Final = "layer_count"
 
 # Platforms
-PLATFORMS: Final = ["sensor", "binary_sensor", "button"]
+PLATFORMS: Final = ["sensor", "binary_sensor", "button", "camera"]
