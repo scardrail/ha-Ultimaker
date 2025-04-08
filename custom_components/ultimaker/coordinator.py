@@ -6,7 +6,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Any, Callable
 import aiohttp
-from aiohttp import BasicAuth, DigestAuth
+from aiohttp_digest import DigestAuth
 import async_timeout
 import json
 
@@ -56,30 +56,29 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        entry: ConfigEntry,
+        config_entry: ConfigEntry,
     ) -> None:
-        """Initialize."""
-        self.host = entry.data["host"]
-        self.session = async_get_clientsession(hass)
-        self.auth = None
-        self._auth_id = entry.data.get(CONF_AUTH_ID)
-        self._auth_key = entry.data.get(CONF_AUTH_KEY)
-        
-        if self._auth_id and self._auth_key:
-            self.auth = DigestAuth(self._auth_id, self._auth_key)
-
+        """Initialize the coordinator."""
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=UPDATE_INTERVAL),
         )
+        self.config_entry = config_entry
+        self._host = config_entry.data["host"]
+        self._auth_id = config_entry.data.get(CONF_AUTH_ID)
+        self._auth_key = config_entry.data.get(CONF_AUTH_KEY)
+        self._session = async_get_clientsession(hass)
+        self._auth = None
+        if self._auth_id and self._auth_key:
+            self._auth = DigestAuth(self._auth_id, self._auth_key)
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Update data via library."""
         try:
             async with async_timeout.timeout(10):
-                _LOGGER.debug("Fetching printer data from %s", self.host)
+                _LOGGER.debug("Fetching printer data from %s", self._host)
                 
                 printer_data = await self._fetch_data(API_PRINTER)
                 _LOGGER.debug("Printer data: %s", printer_data)
@@ -158,10 +157,10 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _fetch_data(self, endpoint: str) -> Any:
         """Fetch data from the printer."""
-        url = f"http://{self.host}{endpoint}"
+        url = f"http://{self._host}{endpoint}"
         
         try:
-            async with self.session.get(url, headers=HEADERS) as response:
+            async with self._session.get(url, headers=HEADERS) as response:
                 _LOGGER.debug("GET %s -> %s", url, response.status)
                 
                 if response.status == 200:
@@ -225,131 +224,75 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Unexpected error fetching data from %s: %s", url, err, exc_info=True)
             return {}
 
-    async def _send_command(self, endpoint: str, method: str = "PUT", data: Any = None) -> bool:
-        """Send a command to the printer."""
-        url = f"http://{self.host}{endpoint}"
-        
-        # Vérifier si nous avons besoin d'authentification
-        if method in ["PUT", "POST", "DELETE"]:
-            if not self.auth:
-                auth_result = await self._request_auth()
-                if not auth_result:
-                    _LOGGER.error("Failed to authenticate with printer")
-                    return False
-        
-        try:
-            if isinstance(data, dict):
-                async with self.session.request(
-                    method, 
-                    url, 
-                    json=data, 
-                    headers=HEADERS,
-                    auth=self.auth
-                ) as response:
-                    if response.status == 401:
-                        # Essayer de renouveler l'authentification
-                        auth_result = await self._request_auth()
-                        if not auth_result:
-                            return False
-                        # Réessayer la requête avec la nouvelle authentification
-                        async with self.session.request(
-                            method, 
-                            url, 
-                            json=data, 
-                            headers=HEADERS,
-                            auth=self.auth
-                        ) as retry_response:
-                            return retry_response.status in (200, 204)
-                    return response.status in (200, 204)
-            else:
-                # Pour les cas où data n'est pas un dict (ex: température qui est un float)
-                async with self.session.request(
-                    method, 
-                    url, 
-                    json={"temperature": data}, 
-                    headers=HEADERS,
-                    auth=self.auth
-                ) as response:
-                    if response.status == 401:
-                        # Essayer de renouveler l'authentification
-                        auth_result = await self._request_auth()
-                        if not auth_result:
-                            return False
-                        # Réessayer la requête avec la nouvelle authentification
-                        async with self.session.request(
-                            method, 
-                            url, 
-                            json={"temperature": data}, 
-                            headers=HEADERS,
-                            auth=self.auth
-                        ) as retry_response:
-                            return retry_response.status in (200, 204)
-                    return response.status in (200, 204)
-        except aiohttp.ClientError as err:
-            _LOGGER.error("Error sending command to %s: %s", url, err)
-            return False
-
-    async def _request_auth(self) -> bool:
+    async def _request_auth(self) -> None:
         """Request authentication from the printer."""
-        url = f"http://{self.host}{API_AUTH_REQUEST}"
+        url = f"http://{self._host}{API_AUTH_REQUEST}"
+        data = {"application": AUTH_APP_NAME}
+        
         try:
-            # 1. Demander l'authentification
-            async with self.session.post(
-                url,
-                data={
-                    "application": AUTH_APP_NAME,
-                    "user": AUTH_USER_NAME
-                },
-                headers=HEADERS
-            ) as response:
-                if response.status != 200:
-                    _LOGGER.error("Failed to request authentication: %s", response.status)
-                    return False
-                
-                auth_data = await response.json()
-                auth_id = auth_data.get("id")
-                auth_key = auth_data.get("key")
-                
-                if not auth_id or not auth_key:
-                    _LOGGER.error("Invalid authentication response: %s", auth_data)
-                    return False
-                
-                # 2. Attendre l'autorisation
-                check_url = f"http://{self.host}{API_AUTH_CHECK}/{auth_id}"
-                start_time = datetime.now()
-                
-                while (datetime.now() - start_time).total_seconds() < AUTH_CHECK_TIMEOUT:
-                    async with self.session.get(check_url, headers=HEADERS) as check_response:
-                        if check_response.status != 200:
-                            await asyncio.sleep(AUTH_CHECK_INTERVAL)
-                            continue
+            async with self._session.post(url, json=data) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    self._auth_id = result.get("id")
+                    self._auth_key = result.get("key")
+                    
+                    if self._auth_id and self._auth_key:
+                        self._auth = DigestAuth(self._auth_id, self._auth_key)
                         
-                        check_data = await check_response.json()
-                        if check_data.get("message") == "authorized":
-                            # Mettre à jour l'authentification
-                            self.auth = DigestAuth(auth_id, auth_key)
-                            # Sauvegarder les identifiants
-                            self.hass.config_entries.async_update_entry(
-                                self._entry,
-                                data={
-                                    **self._entry.data,
-                                    CONF_AUTH_ID: auth_id,
-                                    CONF_AUTH_KEY: auth_key,
-                                },
-                            )
-                            return True
-                        elif check_data.get("message") == "unauthorized":
-                            _LOGGER.error("Authorization rejected by user")
-                            return False
+                        # Save the credentials
+                        new_data = dict(self.config_entry.data)
+                        new_data[CONF_AUTH_ID] = self._auth_id
+                        new_data[CONF_AUTH_KEY] = self._auth_key
+                        self.hass.config_entries.async_update_entry(
+                            self.config_entry, data=new_data
+                        )
+                    else:
+                        raise ConfigEntryAuthFailed("Failed to get authentication credentials")
+                else:
+                    raise ConfigEntryAuthFailed(f"Authentication request failed with status {response.status}")
+        except aiohttp.ClientError as err:
+            raise ConfigEntryAuthFailed(f"Error requesting authentication: {err}")
+
+    async def _send_command(self, endpoint: str, method: str = "GET", data: dict | None = None) -> Any:
+        """Send command to the printer."""
+        url = f"http://{self._host}{endpoint}"
+        
+        try:
+            if method == "GET":
+                if self._auth:
+                    async with self._auth.session(self._session) as auth_session:
+                        async with auth_session.get(url) as response:
+                            if response.status == 401:
+                                await self._request_auth()
+                                return await self._send_command(endpoint, method, data)
+                            response.raise_for_status()
+                            return await response.json()
+                else:
+                    async with self._session.get(url) as response:
+                        if response.status == 401:
+                            await self._request_auth()
+                            return await self._send_command(endpoint, method, data)
+                        response.raise_for_status()
+                        return await response.json()
+            else:
+                if self._auth:
+                    async with self._auth.session(self._session) as auth_session:
+                        async with auth_session.put(url, json=data) as response:
+                            if response.status == 401:
+                                await self._request_auth()
+                                return await self._send_command(endpoint, method, data)
+                            response.raise_for_status()
+                            return await response.json()
+                else:
+                    async with self._session.put(url, json=data) as response:
+                        if response.status == 401:
+                            await self._request_auth()
+                            return await self._send_command(endpoint, method, data)
+                        response.raise_for_status()
+                        return await response.json()
                         
-                        await asyncio.sleep(AUTH_CHECK_INTERVAL)
-                
-                _LOGGER.error("Authorization timeout")
-                return False
-                
-        except Exception as err:
-            _LOGGER.error("Error during authentication: %s", err)
-            return False
+        except aiohttp.ClientError as err:
+            raise UpdateFailed(f"Error communicating with printer: {err}")
 
     async def async_pause_print(self) -> bool:
         """Pause the current print job."""
