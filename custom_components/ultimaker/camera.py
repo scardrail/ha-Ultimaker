@@ -49,7 +49,7 @@ async def async_setup_entry(
 class UltimakerCamera(Camera):
     """Camera class for Ultimaker."""
 
-    _attr_supported_features = 0
+    _attr_supported_features = CameraEntityFeature(0)
 
     def __init__(
         self,
