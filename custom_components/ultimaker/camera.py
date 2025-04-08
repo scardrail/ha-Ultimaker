@@ -41,6 +41,7 @@ class UltimakerCamera(Camera):
     """Camera class for Ultimaker."""
 
     # _attr_supported_features = CameraEntityFeature(0)
+    _attr_supported_features = CameraEntityFeature.STREAM
 
     def __init__(
         self,
@@ -82,7 +83,8 @@ class UltimakerCamera(Camera):
 
     async def stream_source(self) -> str | None:
         """Return the source of the stream."""
-        return self._camera_feed_url
+        # return self.
+        return "http://10.191.62.103:8080/?action=stream"
 
     async def async_camera_image(self, width: int | None = None, height: int | None = None) -> bytes | None:
         """Return a still image from the camera feed."""
