@@ -95,12 +95,23 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                     camera_feed = await self._fetch_data(API_CAMERA_FEED)
                     _LOGGER.debug("Camera feed data: %s", camera_feed)
                     
+                    # Gestion propre du feed
                     if isinstance(camera_feed, str) and camera_feed.startswith("http"):
                         camera_data["feed"] = camera_feed
-                        _LOGGER.info("Camera feed URL found: %s", camera_feed)
-                    elif isinstance(camera_feed, dict) and "feed" in camera_feed:
-                        camera_data["feed"] = camera_feed["feed"]
-                        _LOGGER.info("Camera feed URL found in dict: %s", camera_data["feed"])
+                        _LOGGER.info("Camera feed URL found (string): %s", camera_feed)
+
+                    elif isinstance(camera_feed, dict):
+                        # Cas: réponse sous {"value": "http://..."}
+                        if "value" in camera_feed and str(camera_feed["value"]).startswith("http"):
+                            camera_data["feed"] = camera_feed["value"]
+                            _LOGGER.info("Camera feed URL found in 'value': %s", camera_data["feed"])
+                        elif "feed" in camera_feed and str(camera_feed["feed"]).startswith("http"):
+                            camera_data["feed"] = camera_feed["feed"]
+                            _LOGGER.info("Camera feed URL found in 'feed': %s", camera_data["feed"])
+                        else:
+                            camera_data["feed"] = API_CAMERA_STREAM
+                            _LOGGER.warning("Fallback to default stream path: %s", API_CAMERA_STREAM)
+
                     else:
                         camera_data["feed"] = API_CAMERA_STREAM
                         _LOGGER.warning("Fallback to default stream path: %s", API_CAMERA_STREAM)
