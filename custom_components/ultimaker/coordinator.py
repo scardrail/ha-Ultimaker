@@ -40,6 +40,18 @@ from .const import (
     AUTH_CHECK_TIMEOUT,
     CONF_AUTH_ID,
     CONF_AUTH_KEY,
+    API_PRINTER_HEADS,
+    API_PRINTER_HEAD,
+    API_PRINT_JOB_PROGRESS,
+    API_PRINT_JOB_TIME_ELAPSED,
+    API_PRINT_JOB_TIME_TOTAL,
+    API_SYSTEM_FIRMWARE,
+    API_SYSTEM_VARIANT,
+    API_SYSTEM_UPTIME,
+    API_AMBIENT_TEMPERATURE,
+    API_LED_HUE,
+    API_LED_SATURATION,
+    API_LED_BRIGHTNESS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,61 +91,94 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
             async with async_timeout.timeout(10):
                 _LOGGER.debug("Fetching printer data from %s", self._host)
                 
+                # Récupérer les données de base de l'imprimante
                 printer_data = await self._fetch_data(API_PRINTER)
-                _LOGGER.debug("Printer data: %s", printer_data)
-                
                 if not isinstance(printer_data, dict):
-                    _LOGGER.error("Invalid printer data type: %s", type(printer_data))
                     printer_data = {}
+                
+                # Récupérer les données des têtes d'impression
+                heads_data = await self._fetch_data(API_PRINTER_HEADS)
+                if isinstance(heads_data, list):
+                    printer_data["heads"] = heads_data
+                    
+                    # Pour chaque tête, récupérer les données détaillées
+                    for i, head in enumerate(heads_data):
+                        head_url = API_PRINTER_HEAD.format(head_id=i)
+                        head_data = await self._fetch_data(head_url)
+                        if isinstance(head_data, dict):
+                            printer_data["heads"][i].update(head_data)
+                            
+                        # Pour chaque extrudeur de la tête
+                        if "extruders" in head:
+                            for j, _ in enumerate(head["extruders"]):
+                                temp_url = API_HOTEND_TEMPERATURE.format(head_id=i, extruder_id=j)
+                                temp_data = await self._fetch_data(temp_url)
+                                if isinstance(temp_data, dict):
+                                    printer_data["heads"][i]["extruders"][j]["hotend"]["temperature"] = temp_data
 
+                # Récupérer les données du lit chauffant
+                bed_temp_data = await self._fetch_data(API_BED_TEMPERATURE)
+                if isinstance(bed_temp_data, dict):
+                    if "bed" not in printer_data:
+                        printer_data["bed"] = {}
+                    printer_data["bed"]["temperature"] = bed_temp_data
+
+                # Récupérer les données du travail d'impression en cours
                 print_job_data = await self._fetch_data(API_PRINT_JOB)
                 if not isinstance(print_job_data, dict):
                     print_job_data = {}
+                else:
+                    # Ajouter les détails supplémentaires du travail d'impression
+                    progress = await self._fetch_data(API_PRINT_JOB_PROGRESS)
+                    if isinstance(progress, (int, float)):
+                        print_job_data["progress"] = progress
+                    
+                    time_elapsed = await self._fetch_data(API_PRINT_JOB_TIME_ELAPSED)
+                    if isinstance(time_elapsed, (int, float)):
+                        print_job_data["time_elapsed"] = time_elapsed
+                    
+                    time_total = await self._fetch_data(API_PRINT_JOB_TIME_TOTAL)
+                    if isinstance(time_total, (int, float)):
+                        print_job_data["time_total"] = time_total
 
+                # Récupérer les données système
                 system_data = await self._fetch_data(API_SYSTEM)
                 if not isinstance(system_data, dict):
                     system_data = {}
-
-                bed_temp_data = await self._fetch_data(API_BED_TEMPERATURE)
-                if not isinstance(bed_temp_data, dict):
-                    bed_temp_data = {}
-
-                hotend_temp_data = await self._fetch_data(API_HOTEND_TEMPERATURE)
-                if not isinstance(hotend_temp_data, dict):
-                    hotend_temp_data = {}
-
-                camera_data = await self._fetch_data(API_CAMERA)
-                if not isinstance(camera_data, dict):
-                    camera_data = {}
-
-                # Traitement des données de caméra
-                if camera_data:
-                    _LOGGER.debug("Camera data found: %s", camera_data)
-                    camera_feed = await self._fetch_data(API_CAMERA_FEED)
-                    _LOGGER.debug("Camera feed data: %s", camera_feed)
+                else:
+                    # Ajouter les détails supplémentaires du système
+                    firmware = await self._fetch_data(API_SYSTEM_FIRMWARE)
+                    if isinstance(firmware, str):
+                        system_data["firmware"] = firmware
                     
-                    # Gestion propre du feed
+                    variant = await self._fetch_data(API_SYSTEM_VARIANT)
+                    if isinstance(variant, str):
+                        system_data["variant"] = variant
+                    
+                    uptime = await self._fetch_data(API_SYSTEM_UPTIME)
+                    if isinstance(uptime, (int, float)):
+                        system_data["uptime"] = uptime
+
+                # Récupérer les données de la caméra
+                camera_data = await self._fetch_data(API_CAMERA)
+                if isinstance(camera_data, dict):
+                    camera_feed = await self._fetch_data(API_CAMERA_FEED)
                     if isinstance(camera_feed, str) and camera_feed.startswith("http"):
                         camera_data["feed"] = camera_feed
-                        _LOGGER.info("Camera feed URL found (string): %s", camera_feed)
-
                     elif isinstance(camera_feed, dict):
-                        # Cas: réponse sous {"value": "http://..."}
                         if "value" in camera_feed and str(camera_feed["value"]).startswith("http"):
                             camera_data["feed"] = camera_feed["value"]
-                            _LOGGER.info("Camera feed URL found in 'value': %s", camera_data["feed"])
                         elif "feed" in camera_feed and str(camera_feed["feed"]).startswith("http"):
                             camera_data["feed"] = camera_feed["feed"]
-                            _LOGGER.info("Camera feed URL found in 'feed': %s", camera_data["feed"])
                         else:
-                            camera_data["feed"] = API_CAMERA_STREAM
-                            _LOGGER.warning("Fallback to default stream path: %s", API_CAMERA_STREAM)
-
+                            camera_data["feed"] = API_CAMERA_STREAM.format(index=0)
                     else:
-                        camera_data["feed"] = API_CAMERA_STREAM
-                        _LOGGER.warning("Fallback to default stream path: %s", API_CAMERA_STREAM)
-                else:
-                    _LOGGER.debug("No camera data available from API")
+                        camera_data["feed"] = API_CAMERA_STREAM.format(index=0)
+
+                # Récupérer la température ambiante
+                ambient_temp = await self._fetch_data(API_AMBIENT_TEMPERATURE)
+                if isinstance(ambient_temp, dict):
+                    printer_data["ambient_temperature"] = ambient_temp
 
                 data = {
                     "printer": {
@@ -142,8 +187,6 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                     },
                     "print_job": print_job_data,
                     "system": system_data,
-                    "bed_temperature": bed_temp_data,
-                    "hotend_temperature": hotend_temp_data,
                     "last_update": datetime.now(),
                 }
 
@@ -298,76 +341,72 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         _LOGGER.error("Authorization request timed out")
         return False
 
-    async def _send_command(self, endpoint: str, method: str = "GET", data: dict | None = None) -> Any:
+    async def _send_command(self, endpoint: str, method: str = "PUT", data: dict | None = None) -> Any:
         """Send command to the printer."""
         url = f"http://{self._host}{endpoint}"
         
         try:
-            if method == "GET":
-                if self._auth:
-                    async with self._auth.session(self._session) as auth_session:
-                        async with auth_session.get(url) as response:
-                            if response.status == 401:
-                                await self._request_auth()
-                                return await self._send_command(endpoint, method, data)
-                            response.raise_for_status()
-                            return await response.json()
-                else:
-                    async with self._session.get(url) as response:
-                        if response.status == 401:
-                            await self._request_auth()
-                            return await self._send_command(endpoint, method, data)
-                        response.raise_for_status()
-                        return await response.json()
-            else:
-                if self._auth:
-                    async with self._auth.session(self._session) as auth_session:
+            if self._auth:
+                async with self._auth.session(self._session) as auth_session:
+                    if method == "PUT":
                         async with auth_session.put(url, json=data) as response:
                             if response.status == 401:
                                 await self._request_auth()
                                 return await self._send_command(endpoint, method, data)
                             response.raise_for_status()
-                            return await response.json()
-                else:
+                            return await response.json() if response.status != 204 else None
+                    elif method == "POST":
+                        async with auth_session.post(url, json=data) as response:
+                            if response.status == 401:
+                                await self._request_auth()
+                                return await self._send_command(endpoint, method, data)
+                            response.raise_for_status()
+                            return await response.json() if response.status != 204 else None
+            else:
+                if method == "PUT":
                     async with self._session.put(url, json=data) as response:
                         if response.status == 401:
                             await self._request_auth()
                             return await self._send_command(endpoint, method, data)
                         response.raise_for_status()
-                        return await response.json()
+                        return await response.json() if response.status != 204 else None
+                elif method == "POST":
+                    async with self._session.post(url, json=data) as response:
+                        if response.status == 401:
+                            await self._request_auth()
+                            return await self._send_command(endpoint, method, data)
+                        response.raise_for_status()
+                        return await response.json() if response.status != 204 else None
                         
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with printer: {err}")
 
-    async def async_pause_print(self) -> bool:
+    async def async_pause_print(self) -> None:
         """Pause the current print job."""
-        return await self._send_command(API_PRINT_JOB_STATE, data=PRINT_JOB_STATE_PAUSED)
+        await self._send_command(API_PRINT_JOB_STATE, "PUT", {"target": "pause"})
 
-    async def async_resume_print(self) -> bool:
+    async def async_resume_print(self) -> None:
         """Resume the current print job."""
-        return await self._send_command(API_PRINT_JOB_STATE, data=PRINT_JOB_STATE_PRINTING)
+        await self._send_command(API_PRINT_JOB_STATE, "PUT", {"target": "print"})
 
-    async def async_stop_print(self) -> bool:
+    async def async_stop_print(self) -> None:
         """Stop the current print job."""
-        return await self._send_command(API_PRINT_JOB_STATE, data=PRINT_JOB_STATE_ABORTED)
+        await self._send_command(API_PRINT_JOB_STATE, "PUT", {"target": "abort"})
 
-    async def async_set_bed_temperature(self, temperature: float) -> bool:
+    async def async_set_bed_temperature(self, temperature: float) -> None:
         """Set the bed temperature."""
-        return await self._send_command(
-            API_BED_TEMPERATURE,
-            data=temperature
-        )
+        await self._send_command(API_BED_TEMPERATURE, "PUT", {"target": temperature})
 
-    async def async_set_hotend_temperature(self, temperature: float) -> bool:
+    async def async_set_hotend_temperature(self, head_id: int, extruder_id: int, temperature: float) -> None:
         """Set the hotend temperature."""
-        return await self._send_command(
-            API_HOTEND_TEMPERATURE,
-            data=temperature
-        )
+        endpoint = API_HOTEND_TEMPERATURE.format(head_id=head_id, extruder_id=extruder_id)
+        await self._send_command(endpoint, "PUT", {"target": temperature})
 
-    async def async_set_led(self, led_data: dict[str, Any]) -> bool:
+    async def async_set_led(self, hue: float = None, saturation: float = None, brightness: float = None) -> None:
         """Set the LED state."""
-        return await self._send_command(
-            API_LED,
-            data=led_data
-        ) 
+        if hue is not None:
+            await self._send_command(API_LED_HUE, "PUT", hue)
+        if saturation is not None:
+            await self._send_command(API_LED_SATURATION, "PUT", saturation)
+        if brightness is not None:
+            await self._send_command(API_LED_BRIGHTNESS, "PUT", brightness) 
