@@ -48,7 +48,6 @@ from .const import (
     API_SYSTEM_FIRMWARE,
     API_SYSTEM_VARIANT,
     API_SYSTEM_UPTIME,
-    API_AMBIENT_TEMPERATURE,
     API_LED_HUE,
     API_LED_SATURATION,
     API_LED_BRIGHTNESS,
@@ -174,11 +173,6 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                             camera_data["feed"] = API_CAMERA_STREAM.format(index=0)
                     else:
                         camera_data["feed"] = API_CAMERA_STREAM.format(index=0)
-
-                # Récupérer la température ambiante
-                ambient_temp = await self._fetch_data(API_AMBIENT_TEMPERATURE)
-                if isinstance(ambient_temp, dict):
-                    printer_data["ambient_temperature"] = ambient_temp
 
                 data = {
                     "printer": {
@@ -310,7 +304,7 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         """Wait for physical authorization on the printer."""
         check_url = f"http://{self._host}{API_AUTH_CHECK}/{auth_id}"
         start_time = datetime.now() 
-            
+
         while (datetime.now() - start_time).total_seconds() < AUTH_CHECK_TIMEOUT:
             try:
                 async with self._session.get(check_url) as response:

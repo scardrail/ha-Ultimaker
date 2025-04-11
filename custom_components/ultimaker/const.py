@@ -31,7 +31,6 @@ API_PRINTER_HEAD_EXTRUDER: Final = f"{API_BASE}/printer/heads/{{head_id}}/extrud
 # Temperature endpoints
 API_BED_TEMPERATURE: Final = f"{API_BASE}/printer/bed/temperature"
 API_HOTEND_TEMPERATURE: Final = f"{API_BASE}/printer/heads/{{head_id}}/extruders/{{extruder_id}}/hotend/temperature"
-API_AMBIENT_TEMPERATURE: Final = f"{API_BASE}/ambient_temperature"
 
 # Print job endpoints
 API_PRINT_JOB: Final = f"{API_BASE}/print_job"

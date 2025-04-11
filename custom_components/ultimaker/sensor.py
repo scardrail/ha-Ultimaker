@@ -79,14 +79,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
             else 0
         ),
     ),
-    UltimakerSensorEntityDescription(
-        key="ambient_temperature",
-        name="Ambient Temperature",
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        device_class=SensorDeviceClass.TEMPERATURE,
-        state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data.get("printer", {}).get("ambient_temperature", {}).get("current"),
-    ),
+    
     UltimakerSensorEntityDescription(
         key="print_start_time",
         name="Print Start Time",
