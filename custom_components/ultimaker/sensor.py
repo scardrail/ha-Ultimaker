@@ -184,6 +184,62 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         icon="mdi:clock-outline",
         value_fn=lambda data: data.get("print_job", {}).get("time_total", 0),
     ),
+    UltimakerSensorEntityDescription(
+        key="filament_1",
+        name="Filament 1",
+        icon="mdi:printer-3d-nozzle",
+        value_fn=lambda data: (
+            data.get("printer", {})
+            .get("heads", [{}])[0]
+            .get("extruders", [{}])[0]
+            .get("active_material", {})
+            .get("data", "Unknown")
+        ),
+    ),
+    UltimakerSensorEntityDescription(
+        key="filament_1_remaining",
+        name="Filament 1 Remaining",
+        icon="mdi:printer-3d-nozzle",
+        native_unit_of_measurement="mm",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: (
+            data.get("printer", {})
+            .get("heads", [{}])[0]
+            .get("extruders", [{}])[0]
+            .get("active_material", {})
+            .get("length_remaining", 0)
+        ),
+    ),
+    UltimakerSensorEntityDescription(
+        key="filament_2",
+        name="Filament 2",
+        icon="mdi:printer-3d-nozzle",
+        value_fn=lambda data: (
+            data.get("printer", {})
+            .get("heads", [{}])[0]
+            .get("extruders", [{}])[1]
+            .get("active_material", {})
+            .get("data", "Unknown")
+            if len(data.get("printer", {}).get("heads", [{}])[0].get("extruders", [])) > 1
+            else None
+        ),
+    ),
+    UltimakerSensorEntityDescription(
+        key="filament_2_remaining",
+        name="Filament 2 Remaining",
+        icon="mdi:printer-3d-nozzle",
+        native_unit_of_measurement="mm",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: (
+            data.get("printer", {})
+            .get("heads", [{}])[0]
+            .get("extruders", [{}])[1]
+            .get("active_material", {})
+            .get("length_remaining", 0)
+            if len(data.get("printer", {}).get("heads", [{}])[0].get("extruders", [])) > 1
+            else None
+        ),
+    ),
 )
 
 async def async_setup_entry(

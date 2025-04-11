@@ -95,12 +95,12 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                 if not isinstance(printer_data, dict):
                     printer_data = {}
                 
-                # Récupérer les données des têtes d'impression
+                # Récupérer les données des têtes d'impression et des matériaux
                 heads_data = await self._fetch_data(API_PRINTER_HEADS)
                 if isinstance(heads_data, list):
                     printer_data["heads"] = heads_data
                     
-                    # Pour chaque tête, récupérer les données détaillées
+                    # Pour chaque tête, récupérer les données détaillées et les matériaux
                     for i, head in enumerate(heads_data):
                         head_url = API_PRINTER_HEAD.format(head_id=i)
                         head_data = await self._fetch_data(head_url)
@@ -109,11 +109,19 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                             
                         # Pour chaque extrudeur de la tête
                         if "extruders" in head:
-                            for j, _ in enumerate(head["extruders"]):
+                            for j, extruder in enumerate(head["extruders"]):
+                                # Récupérer la température
                                 temp_url = API_HOTEND_TEMPERATURE.format(head_id=i, extruder_id=j)
                                 temp_data = await self._fetch_data(temp_url)
                                 if isinstance(temp_data, dict):
                                     printer_data["heads"][i]["extruders"][j]["hotend"]["temperature"] = temp_data
+                                
+                                # Récupérer les informations sur le matériau
+                                material_guid = extruder.get("active_material", {}).get("GUID")
+                                if material_guid:
+                                    material_data = await self._fetch_data(f"/api/v1/materials/{material_guid}")
+                                    if material_data:
+                                        printer_data["heads"][i]["extruders"][j]["active_material"]["data"] = material_data
 
                 # Récupérer les données du lit chauffant
                 bed_temp_data = await self._fetch_data(API_BED_TEMPERATURE)
@@ -198,70 +206,19 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             async with self._session.get(url, headers=HEADERS) as response:
                 _LOGGER.debug("GET %s -> %s", url, response.status)
-                return await self._process_response(response, endpoint)
+                
+                if response.status == 404:
+                    _LOGGER.debug("Resource not found at %s: %s", endpoint, response.status)
+                    return None
+                    
+                return await response.json()
                     
         except aiohttp.ClientError as err:
             _LOGGER.error("Error fetching data from %s: %s", url, err)
-            return {}
+            return None
         except Exception as err:
             _LOGGER.error("Unexpected error fetching data from %s: %s", url, err, exc_info=True)
-            return {}
-
-    async def _process_response(self, response: aiohttp.ClientResponse, endpoint: str) -> Any:
-        """Process the response from the printer."""
-        if response.status == 200:
-            content_type = response.headers.get("Content-Type", "")
-            text = await response.text()
-            _LOGGER.debug("Response text from %s: %s", endpoint, text)
-            
-            if not text:
-                _LOGGER.warning("Empty response from %s", endpoint)
-                return {}
-
-            # Si le contenu est du JSON
-            if "application/json" in content_type:
-                try:
-                    data = json.loads(text)
-                    if isinstance(data, dict):
-                        return data
-                    elif isinstance(data, (int, float, str, bool)):
-                        return {"value": data}
-                    return {}
-                except json.JSONDecodeError as err:
-                    _LOGGER.error(
-                        "Failed to decode JSON from %s: %s (text: %s)", endpoint, err, text
-                    )
-                    return {}
-            
-            # Si c'est du texte brut (comme l'URL de la caméra)
-            elif "text/plain" in content_type or "text/html" in content_type:
-                if text.strip().startswith("http"):
-                    return text.strip()
-                return {"value": text.strip()}
-            
-            # Pour tout autre type de contenu, on essaie d'abord de parser comme JSON
-            try:
-                data = json.loads(text)
-                if isinstance(data, dict):
-                    return data
-                elif isinstance(data, (int, float, str, bool)):
-                    return {"value": data}
-            except json.JSONDecodeError:
-                # Si ce n'est pas du JSON et que ça ressemble à une URL
-                if text.strip().startswith("http"):
-                    return text.strip()
-                return {"value": text.strip()}
-                    
-        elif response.status == 404:
-            _LOGGER.debug(
-                "Resource not found at %s: %s", endpoint, response.status
-            )
-            return {}
-        else:
-            _LOGGER.error(
-                "Error fetching data from %s: %s", endpoint, response.status
-            )
-            return {}
+            return None
 
     async def _request_auth(self) -> None:
         """Request authentication from the printer."""
