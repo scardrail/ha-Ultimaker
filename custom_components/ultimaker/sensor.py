@@ -189,19 +189,8 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         name="Filament 1",
         icon="mdi:printer-3d-nozzle",
         value_fn=lambda data: (
-            data.get("printer", {})
-            .get("heads", [{}])[0]
-            .get("extruders", [{}])[0]
-            .get("active_material", {})
-            .get("data", {})
-            .get("brand", "Unknown")
-            + " "
-            + data.get("printer", {})
-            .get("heads", [{}])[0]
-            .get("extruders", [{}])[0]
-            .get("active_material", {})
-            .get("data", {})
-            .get("material", "Unknown")
+            f"{data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[0].get('active_material', {}).get('data', {}).get('brand', 'Unknown')} "
+            f"{data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[0].get('active_material', {}).get('data', {}).get('material', 'Unknown')}"
         ),
     ),
     UltimakerSensorEntityDescription(
@@ -223,19 +212,8 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         name="Filament 2",
         icon="mdi:printer-3d-nozzle",
         value_fn=lambda data: (
-            data.get("printer", {})
-            .get("heads", [{}])[0]
-            .get("extruders", [{}])[1]
-            .get("active_material", {})
-            .get("data", {})
-            .get("brand", "Unknown")
-            + " "
-            + data.get("printer", {})
-            .get("heads", [{}])[0]
-            .get("extruders", [{}])[1]
-            .get("active_material", {})
-            .get("data", {})
-            .get("material", "Unknown")
+            f"{data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[1].get('active_material', {}).get('data', {}).get('brand', 'Unknown')} "
+            f"{data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[1].get('active_material', {}).get('data', {}).get('material', 'Unknown')}"
             if len(data.get("printer", {}).get("heads", [{}])[0].get("extruders", [])) > 1
             else None
         ),
