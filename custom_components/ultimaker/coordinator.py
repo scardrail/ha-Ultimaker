@@ -202,19 +202,9 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         url = f"http://{self._host}{endpoint}"
         
         try:
-            if self._auth:
-                async with self._auth.session(self._session) as auth_session:
-                    async with auth_session.get(url, headers=HEADERS) as response:
-                        if response.status == 401:
-                            await self._request_auth()
-                            return await self._fetch_data(endpoint)
-                        return await self._process_response(response, endpoint)
-            else:
-                async with self._session.get(url, headers=HEADERS) as response:
-                    if response.status == 401:
-                        await self._request_auth()
-                        return await self._fetch_data(endpoint)
-                    return await self._process_response(response, endpoint)
+            async with self._session.get(url, headers=HEADERS) as response:
+                _LOGGER.debug("GET %s -> %s", url, response.status)
+                return await self._process_response(response, endpoint)
                     
         except aiohttp.ClientError as err:
             _LOGGER.error("Error fetching data from %s: %s", url, err)
@@ -346,7 +336,11 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
         url = f"http://{self._host}{endpoint}"
         
         try:
-            if self._auth:
+            # Authentification requise uniquement pour PUT/POST/DELETE
+            if method in ["PUT", "POST", "DELETE"]:
+                if not self._auth:
+                    await self._request_auth()
+                
                 async with self._auth.session(self._session) as auth_session:
                     if method == "PUT":
                         async with auth_session.put(url, json=data) as response:
@@ -362,21 +356,18 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                                 return await self._send_command(endpoint, method, data)
                             response.raise_for_status()
                             return await response.json() if response.status != 204 else None
+                    elif method == "DELETE":
+                        async with auth_session.delete(url) as response:
+                            if response.status == 401:
+                                await self._request_auth()
+                                return await self._send_command(endpoint, method, data)
+                            response.raise_for_status()
+                            return await response.json() if response.status != 204 else None
             else:
-                if method == "PUT":
-                    async with self._session.put(url, json=data) as response:
-                        if response.status == 401:
-                            await self._request_auth()
-                            return await self._send_command(endpoint, method, data)
-                        response.raise_for_status()
-                        return await response.json() if response.status != 204 else None
-                elif method == "POST":
-                    async with self._session.post(url, json=data) as response:
-                        if response.status == 401:
-                            await self._request_auth()
-                            return await self._send_command(endpoint, method, data)
-                        response.raise_for_status()
-                        return await response.json() if response.status != 204 else None
+                # Pour les autres méthodes, pas besoin d'authentification
+                async with self._session.request(method, url, json=data) as response:
+                    response.raise_for_status()
+                    return await response.json() if response.status != 204 else None
                         
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with printer: {err}")
