@@ -309,8 +309,8 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
     async def _wait_for_auth_approval(self, auth_id: str) -> bool:
         """Wait for physical authorization on the printer."""
         check_url = f"http://{self._host}{API_AUTH_CHECK}/{auth_id}"
-        start_time = datetime.now()
-        
+        start_time = datetime.now() 
+            
         while (datetime.now() - start_time).total_seconds() < AUTH_CHECK_TIMEOUT:
             try:
                 async with self._session.get(check_url) as response:

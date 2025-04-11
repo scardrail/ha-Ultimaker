@@ -13,6 +13,8 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
+    TEMP_CELSIUS,
+    TIME_MINUTES,
     UnitOfTemperature,
     UnitOfTime,
 )
@@ -48,20 +50,36 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         key="ip_address",
         name="IP Address",
         icon="mdi:ip-network",
-        value_fn=lambda data: data["system"].get("hostname", "unknown"),
+        value_fn=lambda data: data.get("system", {}).get("hostname", "unknown"),
     ),
     UltimakerSensorEntityDescription(
         key="connection_mode",
         name="Connection Mode",
         icon="mdi:connection",
-        value_fn=lambda data: "LAN" if data["printer"]["network"]["ethernet"]["connected"] else "WiFi" if data["printer"]["network"]["wifi"]["connected"] else "Unknown",
+        value_fn=lambda data: (
+            "LAN" 
+            if data.get("printer", {}).get("network", {}).get("ethernet", {}).get("connected") 
+            else "WiFi" 
+            if data.get("printer", {}).get("network", {}).get("wifi", {}).get("connected") 
+            else "Unknown"
+        ),
     ),
     UltimakerSensorEntityDescription(
         key="wifi_signal",
         name="WiFi Signal",
         native_unit_of_measurement=PERCENTAGE,
         icon="mdi:wifi",
-        value_fn=lambda data: next((network["strength"] for network in data["printer"]["network"]["wifi_networks"] if network["ssid"] == data["printer"]["network"]["wifi"]["ssid"]), 0) if data["printer"]["network"]["wifi"]["connected"] else 0,
+        value_fn=lambda data: (
+            next(
+                (
+                    network["strength"] 
+                    for network in data.get("printer", {}).get("network", {}).get("wifi_networks", []) 
+                    if network["ssid"] == data.get("printer", {}).get("network", {}).get("wifi", {}).get("ssid")
+                ), 
+                0
+            ) if data.get("printer", {}).get("network", {}).get("wifi", {}).get("connected") 
+            else 0
+        ),
     ),
     UltimakerSensorEntityDescription(
         key="ambient_temperature",
@@ -69,39 +87,47 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data.get("ambient_temperature", {}).get("current", 0),
+        value_fn=lambda data: data.get("printer", {}).get("ambient_temperature", {}).get("current"),
     ),
     UltimakerSensorEntityDescription(
         key="print_start_time",
         name="Print Start Time",
         device_class=SensorDeviceClass.TIMESTAMP,
-        value_fn=lambda data: data["print_job"].get("datetime_started"),
+        value_fn=lambda data: data.get("print_job", {}).get("datetime_started"),
     ),
     UltimakerSensorEntityDescription(
         key="print_end_time",
         name="Print End Time",
         device_class=SensorDeviceClass.TIMESTAMP,
-        value_fn=lambda data: data["print_job"].get("datetime_finished"),
+        value_fn=lambda data: data.get("print_job", {}).get("datetime_finished"),
     ),
     UltimakerSensorEntityDescription(
         key="print_speed",
         name="Print Speed",
         icon="mdi:printer-3d-nozzle",
         native_unit_of_measurement="mm/s",
-        value_fn=lambda data: data["printer"]["heads"][0]["max_speed"]["x"] if data["printer"]["heads"] else 0,
+        value_fn=lambda data: (
+            data.get("printer", {}).get("heads", [{}])[0].get("max_speed", {}).get("x", 0)
+            if data.get("printer", {}).get("heads") 
+            else 0
+        ),
     ),
     UltimakerSensorEntityDescription(
         key="status",
         name="Status",
         icon="mdi:printer-3d",
-        value_fn=lambda data: data["printer"].get("status", "unknown"),
+        value_fn=lambda data: data.get("printer", {}).get("status", "unknown"),
     ),
     UltimakerSensorEntityDescription(
         key="progress",
         name="Progress",
         native_unit_of_measurement=PERCENTAGE,
         icon="mdi:progress-clock",
-        value_fn=lambda data: data["print_job"].get("progress", 0) * 100 if data["print_job"].get("progress") is not None else 0,
+        value_fn=lambda data: (
+            data.get("print_job", {}).get("progress", 0) * 100 
+            if data.get("print_job", {}).get("progress") is not None 
+            else 0
+        ),
     ),
     UltimakerSensorEntityDescription(
         key="bed_temperature",
@@ -109,7 +135,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["printer"]["bed"]["temperature"].get("current", 0),
+        value_fn=lambda data: data.get("printer", {}).get("bed", {}).get("temperature", {}).get("current", 0),
     ),
     UltimakerSensorEntityDescription(
         key="bed_target",
@@ -117,7 +143,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["printer"]["bed"]["temperature"].get("target", 0),
+        value_fn=lambda data: data.get("printer", {}).get("bed", {}).get("temperature", {}).get("target", 0),
     ),
     UltimakerSensorEntityDescription(
         key="hotend_temperature",
@@ -125,7 +151,15 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["printer"]["heads"][0]["extruders"][0]["hotend"]["temperature"].get("current", 0) if data["printer"]["heads"] else 0,
+        value_fn=lambda data: (
+            data.get("printer", {}).get("heads", [{}])[0]
+            .get("extruders", [{}])[0]
+            .get("hotend", {})
+            .get("temperature", {})
+            .get("current", 0)
+            if data.get("printer", {}).get("heads") 
+            else 0
+        ),
     ),
     UltimakerSensorEntityDescription(
         key="hotend_target",
@@ -133,7 +167,15 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data["printer"]["heads"][0]["extruders"][0]["hotend"]["temperature"].get("target", 0) if data["printer"]["heads"] else 0,
+        value_fn=lambda data: (
+            data.get("printer", {}).get("heads", [{}])[0]
+            .get("extruders", [{}])[0]
+            .get("hotend", {})
+            .get("temperature", {})
+            .get("target", 0)
+            if data.get("printer", {}).get("heads") 
+            else 0
+        ),
     ),
     UltimakerSensorEntityDescription(
         key="time_elapsed",
@@ -141,7 +183,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.SECONDS,
         device_class=SensorDeviceClass.DURATION,
         icon="mdi:clock-outline",
-        value_fn=lambda data: data["print_job"].get("time_elapsed", 0),
+        value_fn=lambda data: data.get("print_job", {}).get("time_elapsed", 0),
     ),
     UltimakerSensorEntityDescription(
         key="time_total",
@@ -149,7 +191,7 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.SECONDS,
         device_class=SensorDeviceClass.DURATION,
         icon="mdi:clock-outline",
-        value_fn=lambda data: data["print_job"].get("time_total", 0),
+        value_fn=lambda data: data.get("print_job", {}).get("time_total", 0),
     ),
 )
 
@@ -191,21 +233,37 @@ class UltimakerSensor(CoordinatorEntity[UltimakerDataUpdateCoordinator], SensorE
     @property
     def native_value(self) -> StateType:
         """Return the state of the sensor."""
-        return self.entity_description.value_fn(self.coordinator.data)
+        try:
+            return self.entity_description.value_fn(self.coordinator.data)
+        except (KeyError, IndexError, TypeError):
+            return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the state attributes."""
         data = self.coordinator.data
+        if not data:
+            return {}
+
+        printer_data = data.get("printer", {})
+        bed_temp = printer_data.get("bed", {}).get("temperature", {})
+        hotend_temp = (
+            printer_data.get("heads", [{}])[0]
+            .get("extruders", [{}])[0]
+            .get("hotend", {})
+            .get("temperature", {})
+        )
+        print_job = data.get("print_job", {})
+
         return {
-            ATTR_BED_TEMPERATURE: data["bed_temperature"].get("current"),
-            ATTR_BED_TARGET: data["bed_temperature"].get("target"),
-            ATTR_HOTEND_TEMPERATURE: data["hotend_temperature"].get("current"),
-            ATTR_HOTEND_TARGET: data["hotend_temperature"].get("target"),
-            ATTR_PROGRESS: data["print_job"].get("progress"),
-            ATTR_PRINT_TIME: data["print_job"].get("print_time"),
-            ATTR_ESTIMATED_TIME: data["print_job"].get("estimated_time"),
-            ATTR_FILAMENT_USED: data["print_job"].get("filament_used"),
-            ATTR_LAYER: data["print_job"].get("layer"),
-            ATTR_LAYER_COUNT: data["print_job"].get("layer_count"),
+            ATTR_BED_TEMPERATURE: bed_temp.get("current"),
+            ATTR_BED_TARGET: bed_temp.get("target"),
+            ATTR_HOTEND_TEMPERATURE: hotend_temp.get("current"),
+            ATTR_HOTEND_TARGET: hotend_temp.get("target"),
+            ATTR_PROGRESS: print_job.get("progress"),
+            ATTR_PRINT_TIME: print_job.get("time_elapsed"),
+            ATTR_ESTIMATED_TIME: print_job.get("time_total"),
+            ATTR_FILAMENT_USED: None,  # Non disponible dans l'API actuelle
+            ATTR_LAYER: None,  # Non disponible dans l'API actuelle
+            ATTR_LAYER_COUNT: None,  # Non disponible dans l'API actuelle
         }
