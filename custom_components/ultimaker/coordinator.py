@@ -68,18 +68,30 @@ def parse_material_xml(xml_string: str) -> dict[str, Any]:
     try:
         root = ET.fromstring(xml_string)
         metadata = root.find(".//metadata")
-        if metadata is not None:
-            return {
-                "brand": metadata.findtext("brand", "Unknown"),
-                "material": metadata.findtext("material", "Unknown"),
-                "color": metadata.findtext("color_name", "Unknown"),
-                "density": metadata.findtext("density", "0"),
-                "diameter": metadata.findtext("diameter", "0"),
-            }
-        return {}
+        name = metadata.find(".//name") if metadata is not None else None
+        properties = root.find(".//properties")
+        
+        result = {
+            "brand": name.findtext("brand", "Unknown") if name is not None else "Unknown",
+            "material": name.findtext("material", "Unknown") if name is not None else "Unknown",
+            "color": name.findtext("color", "Unknown") if name is not None else "Unknown",
+            "color_code": metadata.findtext("color_code", "#000000") if metadata is not None else "#000000",
+            "density": properties.findtext("density", "0") if properties is not None else "0",
+            "diameter": properties.findtext("diameter", "0") if properties is not None else "0",
+            "weight": properties.findtext("weight", "0") if properties is not None else "0",
+        }
+        return result
     except ET.ParseError as err:
         _LOGGER.error("Failed to parse material XML: %s", err)
-        return {}
+        return {
+            "brand": "Unknown",
+            "material": "Unknown",
+            "color": "Unknown",
+            "color_code": "#000000",
+            "density": "0",
+            "diameter": "0",
+            "weight": "0",
+        }
 
 class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Ultimaker data."""

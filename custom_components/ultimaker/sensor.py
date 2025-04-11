@@ -191,6 +191,8 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         value_fn=lambda data: (
             f"{data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[0].get('active_material', {}).get('data', {}).get('brand', 'Unknown')} "
             f"{data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[0].get('active_material', {}).get('data', {}).get('material', 'Unknown')}"
+            if isinstance(data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[0].get('active_material', {}).get('data'), dict)
+            else "No Material"
         ),
     ),
     UltimakerSensorEntityDescription(
@@ -214,7 +216,8 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
         value_fn=lambda data: (
             f"{data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[1].get('active_material', {}).get('data', {}).get('brand', 'Unknown')} "
             f"{data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[1].get('active_material', {}).get('data', {}).get('material', 'Unknown')}"
-            if len(data.get("printer", {}).get("heads", [{}])[0].get("extruders", [])) > 1
+            if len(data.get("printer", {}).get("heads", [{}])[0].get("extruders", [])) > 1 and
+            isinstance(data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[1].get('active_material', {}).get('data'), dict)
             else None
         ),
     ),
@@ -245,6 +248,8 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
             .get("active_material", {})
             .get("data", {})
             .get("color", "Unknown")
+            if isinstance(data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[0].get('active_material', {}).get('data'), dict)
+            else "Unknown"
         ),
     ),
     UltimakerSensorEntityDescription(
@@ -258,7 +263,8 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
             .get("active_material", {})
             .get("data", {})
             .get("color", "Unknown")
-            if len(data.get("printer", {}).get("heads", [{}])[0].get("extruders", [])) > 1
+            if len(data.get("printer", {}).get("heads", [{}])[0].get("extruders", [])) > 1 and
+            isinstance(data.get('printer', {}).get('heads', [{}])[0].get('extruders', [{}])[1].get('active_material', {}).get('data'), dict)
             else None
         ),
     ),
