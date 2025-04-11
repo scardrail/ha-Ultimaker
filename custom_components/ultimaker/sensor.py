@@ -193,7 +193,15 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
             .get("heads", [{}])[0]
             .get("extruders", [{}])[0]
             .get("active_material", {})
-            .get("data", "Unknown")
+            .get("data", {})
+            .get("brand", "Unknown")
+            + " "
+            + data.get("printer", {})
+            .get("heads", [{}])[0]
+            .get("extruders", [{}])[0]
+            .get("active_material", {})
+            .get("data", {})
+            .get("material", "Unknown")
         ),
     ),
     UltimakerSensorEntityDescription(
@@ -219,7 +227,15 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
             .get("heads", [{}])[0]
             .get("extruders", [{}])[1]
             .get("active_material", {})
-            .get("data", "Unknown")
+            .get("data", {})
+            .get("brand", "Unknown")
+            + " "
+            + data.get("printer", {})
+            .get("heads", [{}])[0]
+            .get("extruders", [{}])[1]
+            .get("active_material", {})
+            .get("data", {})
+            .get("material", "Unknown")
             if len(data.get("printer", {}).get("heads", [{}])[0].get("extruders", [])) > 1
             else None
         ),
@@ -236,6 +252,34 @@ SENSOR_TYPES: tuple[UltimakerSensorEntityDescription, ...] = (
             .get("extruders", [{}])[1]
             .get("active_material", {})
             .get("length_remaining", 0)
+            if len(data.get("printer", {}).get("heads", [{}])[0].get("extruders", [])) > 1
+            else None
+        ),
+    ),
+    UltimakerSensorEntityDescription(
+        key="filament_1_color",
+        name="Filament 1 Color",
+        icon="mdi:palette",
+        value_fn=lambda data: (
+            data.get("printer", {})
+            .get("heads", [{}])[0]
+            .get("extruders", [{}])[0]
+            .get("active_material", {})
+            .get("data", {})
+            .get("color", "Unknown")
+        ),
+    ),
+    UltimakerSensorEntityDescription(
+        key="filament_2_color",
+        name="Filament 2 Color",
+        icon="mdi:palette",
+        value_fn=lambda data: (
+            data.get("printer", {})
+            .get("heads", [{}])[0]
+            .get("extruders", [{}])[1]
+            .get("active_material", {})
+            .get("data", {})
+            .get("color", "Unknown")
             if len(data.get("printer", {}).get("heads", [{}])[0].get("extruders", [])) > 1
             else None
         ),

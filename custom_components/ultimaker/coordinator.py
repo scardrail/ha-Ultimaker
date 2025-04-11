@@ -8,6 +8,7 @@ from typing import Any, Callable
 import aiohttp
 import async_timeout
 import json
+import xml.etree.ElementTree as ET
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -51,6 +52,8 @@ from .const import (
     API_LED_HUE,
     API_LED_SATURATION,
     API_LED_BRIGHTNESS,
+    API_FILAMENTS,
+    API_FILAMENT_GUID,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -59,6 +62,24 @@ HEADERS = {
     "Accept": "application/json",
     "Content-Type": "application/json",
 }
+
+def parse_material_xml(xml_string: str) -> dict[str, Any]:
+    """Parse le XML du matériau pour extraire les informations utiles."""
+    try:
+        root = ET.fromstring(xml_string)
+        metadata = root.find(".//metadata")
+        if metadata is not None:
+            return {
+                "brand": metadata.findtext("brand", "Unknown"),
+                "material": metadata.findtext("material", "Unknown"),
+                "color": metadata.findtext("color_name", "Unknown"),
+                "density": metadata.findtext("density", "0"),
+                "diameter": metadata.findtext("diameter", "0"),
+            }
+        return {}
+    except ET.ParseError as err:
+        _LOGGER.error("Failed to parse material XML: %s", err)
+        return {}
 
 class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Ultimaker data."""
@@ -119,7 +140,7 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                                 # Récupérer les informations sur le matériau
                                 material_guid = extruder.get("active_material", {}).get("GUID")
                                 if material_guid:
-                                    material_data = await self._fetch_data(f"/api/v1/materials/{material_guid}")
+                                    material_data = await self._fetch_data(API_FILAMENT_GUID.format(material_guid=material_guid))
                                     if material_data:
                                         printer_data["heads"][i]["extruders"][j]["active_material"]["data"] = material_data
 
@@ -210,6 +231,11 @@ class UltimakerDataUpdateCoordinator(DataUpdateCoordinator):
                 if response.status == 404:
                     _LOGGER.debug("Resource not found at %s: %s", endpoint, response.status)
                     return None
+
+                # Si c'est un appel à l'API des matériaux, on traite le XML
+                if endpoint.startswith(API_FILAMENTS) and "application/json" not in response.headers.get("Content-Type", ""):
+                    xml_data = await response.text()
+                    return parse_material_xml(xml_data)
                     
                 return await response.json()
                     

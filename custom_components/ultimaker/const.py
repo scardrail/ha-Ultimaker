@@ -61,6 +61,10 @@ API_SYSTEM_FIRMWARE: Final = f"{API_BASE}/system/firmware"
 API_SYSTEM_VARIANT: Final = f"{API_BASE}/system/variant"
 API_SYSTEM_UPTIME: Final = f"{API_BASE}/system/uptime"
 
+# Filament endpoints
+API_FILAMENTS: Final = f"{API_BASE}/materials"
+API_FILAMENT_GUID: Final = f"{API_BASE}/materials/{{material_guid}}"
+
 # Update interval
 UPDATE_INTERVAL: Final = 30  # seconds
 
